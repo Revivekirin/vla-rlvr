@@ -1,0 +1,26 @@
+{
+  "scripts_parse": true,
+  "shell_syntax": true,
+  "normalization": {
+    "goal": {
+      "normalization_key": "libero_goal_no_noops",
+      "action_dimensions": 7,
+      "proprio_dimensions": 8
+    },
+    "long": {
+      "normalization_key": "libero_10_no_noops",
+      "action_dimensions": 7,
+      "proprio_dimensions": 8
+    },
+    "object": {
+      "normalization_key": "libero_object_no_noops",
+      "action_dimensions": 7,
+      "proprio_dimensions": 8
+    },
+    "spatial": {
+      "normalization_key": "libero_spatial_no_noops",
+      "action_dimensions": 7,
+      "proprio_dimensions": 8
+    }
+  }
+}

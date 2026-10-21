@@ -1,0 +1,11 @@
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -47,7 +47,7 @@
+     "torch==2.2.0",
+     "torchvision==0.17.0",
+     "torchaudio==2.2.0",
+-    "transformers @ git+https://github.com/moojink/transformers-openvla-oft.git",  # IMPORTANT: Use this fork for bidirectional attn (for parallel decoding)
++    "transformers @ git+https://github.com/moojink/transformers-openvla-oft.git@bc339d9ad707454c0c115970db43c260067c61ab",  # IMPORTANT: Use this fork for bidirectional attn (for parallel decoding)
+     "wandb",
+     "tensorflow==2.15.0",
+     "tensorflow_datasets==4.9.3",

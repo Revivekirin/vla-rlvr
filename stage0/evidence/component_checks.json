@@ -1,0 +1,31 @@
+{
+  "sft": {
+    "shape": [
+      1,
+      8,
+      7
+    ],
+    "finite": true,
+    "strict_load": true,
+    "log_prob_matches_unclipped_unit_scale_laplace": true
+  },
+  "ript": {
+    "shape": [
+      1,
+      8,
+      7
+    ],
+    "finite": true,
+    "strict_load": true,
+    "log_prob_matches_unclipped_unit_scale_laplace": true
+  },
+  "adapter": {
+    "tensor_count": 879,
+    "dtypes": [
+      "BF16"
+    ],
+    "scope": "Safetensors header inspected; not loaded into the 7B model."
+  },
+  "scope": "Genuine Goal head weights, CPU float32, synthetic hidden states; no end-to-end inference.",
+  "torch": "2.14.0"
+}

@@ -1,0 +1,10 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.11.16 (main, Aug 27 2026, 14:37:43) [Clang 20.1.8 ]",
+  "torch": "2.14.0",
+  "cuda_available": false,
+  "cuda_device_count": 0,
+  "nvidia_smi": null,
+  "scope": "Existing environment used read-only for CPU component checks; not the target OFT runtime."
+}

@@ -1,0 +1,314 @@
+{
+  "_id": "68295a1f54b087448a02f816",
+  "id": "tanshh97/RIPT_VLA",
+  "private": false,
+  "pipeline_tag": "robotics",
+  "tags": [
+    "safetensors",
+    "robotics",
+    "dataset:yifengzhu-hf/LIBERO-datasets",
+    "arxiv:2505.17016",
+    "base_model:moojink/openvla-7b-oft-finetuned-libero-10",
+    "base_model:finetune:moojink/openvla-7b-oft-finetuned-libero-10",
+    "license:mit",
+    "region:us"
+  ],
+  "downloads": 0,
+  "likes": 5,
+  "modelId": "tanshh97/RIPT_VLA",
+  "author": "tanshh97",
+  "sha": "57532f4abbf81b89a8ff6a642a996fc54b6a6a10",
+  "lastModified": "2025-05-29T01:27:32.000Z",
+  "gated": false,
+  "disabled": false,
+  "model-index": null,
+  "config": {},
+  "cardData": {
+    "base_model": [
+      "moojink/openvla-7b-oft-finetuned-libero-spatial",
+      "moojink/openvla-7b-oft-finetuned-libero-10",
+      "moojink/openvla-7b-oft-finetuned-libero-object",
+      "moojink/openvla-7b-oft-finetuned-libero-goal"
+    ],
+    "datasets": [
+      "yifengzhu-hf/LIBERO-datasets"
+    ],
+    "pipeline_tag": "robotics",
+    "license": "mit"
+  },
+  "siblings": [
+    {
+      "rfilename": ".gitattributes",
+      "blobId": "a6344aac8c09253b3b630fb776ae94478aa0275b",
+      "size": 1519
+    },
+    {
+      "rfilename": "README.md",
+      "blobId": "fcd3e97b906a7b6a365b89a295f9e966ff0d0cfa",
+      "size": 2660
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_GOAL_lora/README.md",
+      "blobId": "9cd959545ff0efa86f50219ebb80072a90b0562e",
+      "size": 5162
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_GOAL_lora/adapter_config.json",
+      "blobId": "c29fa89a2d185bbb00055454bfb0ef5c703bd108",
+      "size": 1052
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_GOAL_lora/adapter_model.safetensors",
+      "blobId": "d55bdc77b69d4662eda52fd8095237508949a8ce",
+      "size": 484458600,
+      "lfs": {
+        "sha256": "f7b679b99c55389f3ee80eee2842f6f393a7cd42e054141de4fe16ca2e32d9cc",
+        "size": 484458600,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_GOAL_lora/openvla_headers.pt",
+      "blobId": "1e637285c874b03c2ff741386e3ec68a5a55323b",
+      "size": 638046816,
+      "lfs": {
+        "sha256": "4766d734cd0e271bb90b04aefc7ef9a457a5df6131c41dcb5473d36037c334b3",
+        "size": 638046816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_LONG_lora/README.md",
+      "blobId": "149816e72bccfbf2d8f6661e6f6ba89ccd1d8b4e",
+      "size": 5211
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_LONG_lora/adapter_config.json",
+      "blobId": "a0e772d228d713f8d80be8f3c59a784fbe783dd6",
+      "size": 1088
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_LONG_lora/adapter_model.safetensors",
+      "blobId": "d97fc50260672451156ea7332d082ec823f02669",
+      "size": 484458600,
+      "lfs": {
+        "sha256": "4c9cf4105afd30bb8d8144d382cf1dbfbf796f9e97a26d9535665f305daeec31",
+        "size": 484458600,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_LONG_lora/openvla_headers.pt",
+      "blobId": "88ffbce2e6591fa7cbd5c8350c1187a3788489b6",
+      "size": 638046816,
+      "lfs": {
+        "sha256": "f1bf1b3555a200dff9497180d34dd3a188418d8dc8ba6e9cad680945122db556",
+        "size": 638046816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/README.md",
+      "blobId": "eff3c3bc94931f6830e46be335f7200304428082",
+      "size": 5164
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/adapter_config.json",
+      "blobId": "78e5cfcc9e4f982beefac56ded40a3d1c4315b76",
+      "size": 1056
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/adapter_model.safetensors",
+      "blobId": "33a7da972fdb19f80ed21076f12a61b5a5362a15",
+      "size": 484458600,
+      "lfs": {
+        "sha256": "8bc7279251ed33bee8d727b3152ea677f2d5c85c5156c56eba80004e6de81d71",
+        "size": 484458600,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/openvla_headers.pt",
+      "blobId": "2d08465d1d121cbfb116168f4ccc6de2cbd1cd66",
+      "size": 638046816,
+      "lfs": {
+        "sha256": "e2d6574b576480648e34aee6157f2a3a9498febe6cd6dfd4a38fd975b13aeb6d",
+        "size": 638046816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/README.md",
+      "blobId": "b2bc81156c10c2f1c7984b0962dfde1398ca64fd",
+      "size": 5165
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/adapter_config.json",
+      "blobId": "8bac2e777c3d1f87029e48dea60eae373206a6a1",
+      "size": 1058
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/adapter_model.safetensors",
+      "blobId": "384195288e8a2547503154f793d33675fc4fa0cb",
+      "size": 484458600,
+      "lfs": {
+        "sha256": "63d6ed2cdbe1aa2fb45c747183b6777d3978182fcf771db46ea9cf8278316516",
+        "size": 484458600,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/openvla_headers.pt",
+      "blobId": "5f3c6e61aa592db08edb5e296a223038b275b68c",
+      "size": 638046816,
+      "lfs": {
+        "sha256": "38dffd34afdb1e3c6fb6daccd3c3d72ce89ad7cdd15705a23f6878e3f805bbd0",
+        "size": 638046816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/scale_header/LIBERO_GOAL_scale_header.pth",
+      "blobId": "de6a2dba68f970f77979a6bc8de66c1879178f91",
+      "size": 335805142,
+      "lfs": {
+        "sha256": "dc4aca9bf8f629cbf92403c20757d660b140a33beee6afde1d1b8d80bdea2e9e",
+        "size": 335805142,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/scale_header/LIBERO_LONG_scale_header.pth",
+      "blobId": "c07f4c988fa118b9bbeb8e3b2603426de10e67af",
+      "size": 335805142,
+      "lfs": {
+        "sha256": "b82e9530b36d70f1f4f4eda1173f9deda8e35993e97bd0997f3c8890b887a346",
+        "size": 335805142,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/scale_header/LIBERO_OBJECT_scale_header.pth",
+      "blobId": "711f90b835680bc122a7e2f4d1e8f500ed48174c",
+      "size": 335805186,
+      "lfs": {
+        "sha256": "64b306f5f4ee69a6a4cacc62875e430ec9ab91055008bf5d537749f1b3879173",
+        "size": 335805186,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "openvla_oft/scale_header/LIBERO_SPATIAL_scale_header.pth",
+      "blobId": "1e93f020a1b1a1f059d7685892c89697cdcb10cb",
+      "size": 335805208,
+      "lfs": {
+        "sha256": "388c491761523d41a28f62b2262d52611c98c1cb89dae09a7290dc1a1c1097b8",
+        "size": 335805208,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_90_ript.pth",
+      "blobId": "98d838301da5a9d5f71e1e0c61775ba6bc08298b",
+      "size": 80209192,
+      "lfs": {
+        "sha256": "640f4c8ad795906fb78036f5f38380e1c81480918aa4d758c0f6b4528be620de",
+        "size": 80209192,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_90_sft.pth",
+      "blobId": "dab0d03c875121cc10a35ac4edb2ae9b3ddd3724",
+      "size": 80204498,
+      "lfs": {
+        "sha256": "995ba02a0ddd490b2ec5a2e580480b204f148e81175297935a13cfe826fd60ea",
+        "size": 80204498,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_GOAL_ript.pth",
+      "blobId": "f1205eb2daf95c0f52f32970dd9f383c9ad18c7e",
+      "size": 80209876,
+      "lfs": {
+        "sha256": "74a020bfa622b9e2bd3943201152c054e5dd199f3d5241b360b9ca08704c61f5",
+        "size": 80209876,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_GOAL_sft.pth",
+      "blobId": "660de54da07222fde63b4f3f85d914314fb3e29b",
+      "size": 80205182,
+      "lfs": {
+        "sha256": "2f5c1ba340196462d0ed9f7533bf40ed4191d2ebef916d66ff779f8c08b7a135",
+        "size": 80205182,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_LONG_ript.pth",
+      "blobId": "219730d12602fdff850ec8127e9e5eeae3516e45",
+      "size": 80209876,
+      "lfs": {
+        "sha256": "b0fde1c14602605af64f37dda425b4276160d9dda0aa668686290df11fb3ac94",
+        "size": 80209876,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_LONG_sft.pth",
+      "blobId": "a78a7e58baea755bd2a0097e75340a59d560a5d8",
+      "size": 80205182,
+      "lfs": {
+        "sha256": "14af94866dc18115c9b924474b22fb5df6c96369b0f78d245cdb458e11af6d97",
+        "size": 80205182,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_OBJECT_ript.pth",
+      "blobId": "a03223f80afc5ac64b1cc6cf788c74730cedc671",
+      "size": 80210560,
+      "lfs": {
+        "sha256": "f918694ce353b3214992cfe8a69c1e85bff0954955eaeec86908b46d864d4242",
+        "size": 80210560,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_OBJECT_sft.pth",
+      "blobId": "c9cde4ff12fd2c39a2d41b13a397c3f4a36782a0",
+      "size": 80205866,
+      "lfs": {
+        "sha256": "8dc1ae8c14ae32019ef5076eeb7386db1f3ebd496f1da4991a7fcec645f14d10",
+        "size": 80205866,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_SPATIAL_ript.pth",
+      "blobId": "cd73f6db02b47d1c82393ddcf25689aa4a2a2bd9",
+      "size": 80210902,
+      "lfs": {
+        "sha256": "792c6f81837cbf09e1822480d1c702f97de2637cc70e6012ca171b2c5bf3e876",
+        "size": 80210902,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "quest/LIBERO_SPATIAL_sft.pth",
+      "blobId": "7544f87a7400aabe03c22635365abdcf2a0928f6",
+      "size": 80206208,
+      "lfs": {
+        "sha256": "dddb7ed3e807f4040d47c46fb6bc29c625c9266c1de5da6aabfec94f2db8306e",
+        "size": 80206208,
+        "pointerSize": 133
+      }
+    }
+  ],
+  "spaces": [],
+  "createdAt": "2025-05-18T03:55:11.000Z",
+  "usedStorage": 9040750268
+}

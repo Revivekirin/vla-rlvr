@@ -1,0 +1,16 @@
+# Candidate Linux CUDA environment; not a complete resolved transitive lock.
+torch==2.2.0
+torchvision==0.17.0
+torchaudio==2.2.0
+numpy==1.26.4
+accelerate==1.6.0
+peft==0.11.1
+tokenizers==0.19.1
+timm==0.9.10
+diffusers==0.30.3
+huggingface-hub==0.25.2
+tensorflow==2.15.0
+tensorflow-datasets==4.9.3
+tensorflow-metadata==1.15.0
+mujoco==3.1.6
+robosuite==1.4.1

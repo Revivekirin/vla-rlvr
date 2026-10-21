@@ -1,0 +1,11 @@
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -10,7 +10,7 @@
+ vector-quantize-pytorch==1.14.24
+ wandb==0.18.3
+ cmake==3.29.3
+-diffusers==0.28.0
++diffusers==0.30.3
+ pyinstrument==4.6.2
+ moviepy==1.0.3
+ tokenizers==0.19.1

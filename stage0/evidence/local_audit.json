@@ -1,0 +1,379 @@
+{
+  "artifacts": {
+    "checkpoints/goal/oft/README.md": {
+      "bytes": 2894,
+      "digest": "a5893b99b03799bb3e400a12b1be9857696ccda4",
+      "verified": true
+    },
+    "checkpoints/goal/oft/action_head--50000_checkpoint.pt": {
+      "bytes": 302242654,
+      "digest": "b97c2e8939ede32d8a1b29e9565d70f22040ba9e54925665e81989a0cc13ccff",
+      "verified": true
+    },
+    "checkpoints/goal/oft/added_tokens.json": {
+      "bytes": 21,
+      "digest": "8671820d1bb0dfd4dd92d5bd0fa9b5a7773f843e",
+      "verified": true
+    },
+    "checkpoints/goal/oft/config.json": {
+      "bytes": 60712,
+      "digest": "42ea81c7c783049559839e305afdfe97e30581a3",
+      "verified": true
+    },
+    "checkpoints/goal/oft/configuration_prismatic.py": {
+      "bytes": 5865,
+      "digest": "c2625753c4da1a6ef274a02645d4086bc7a7fb2b",
+      "verified": true
+    },
+    "checkpoints/goal/oft/dataset_statistics.json": {
+      "bytes": 2923,
+      "digest": "21e206558ba246acc21503336b5afe1c4692a2bb",
+      "verified": true
+    },
+    "checkpoints/goal/oft/generation_config.json": {
+      "bytes": 136,
+      "digest": "2cefc1e51e6ccfe846d2b509ced403df73a8efe2",
+      "verified": true
+    },
+    "checkpoints/goal/oft/model.safetensors.index.json": {
+      "bytes": 94764,
+      "digest": "bd7cc8ff8070ead248023feae55303f5a3b900d1",
+      "verified": true
+    },
+    "checkpoints/goal/oft/modeling_prismatic.py": {
+      "bytes": 49029,
+      "digest": "9013a4f57eb18fa770efcbe9d0a1445d6c16bb72",
+      "verified": true
+    },
+    "checkpoints/goal/oft/preprocessor_config.json": {
+      "bytes": 1650,
+      "digest": "92975ace548590d24f65f497d7610af3b92b4dcd",
+      "verified": true
+    },
+    "checkpoints/goal/oft/processing_prismatic.py": {
+      "bytes": 12718,
+      "digest": "3f2daaf82c3b8946fe57596f656f14a031eaef93",
+      "verified": true
+    },
+    "checkpoints/goal/oft/processor_config.json": {
+      "bytes": 130,
+      "digest": "f892f8a8f53e2f3603a7cf86043a1add317c1787",
+      "verified": true
+    },
+    "checkpoints/goal/oft/proprio_projector--50000_checkpoint.pt": {
+      "bytes": 67275184,
+      "digest": "780595e9cca5292348697686f9ccc83d39d9d3d303e860d62c6d4609952dfff1",
+      "verified": true
+    },
+    "checkpoints/goal/oft/special_tokens_map.json": {
+      "bytes": 552,
+      "digest": "ab75c8e0a22550f0667501a0c52758f071a9efd8",
+      "verified": true
+    },
+    "checkpoints/goal/oft/tokenizer.json": {
+      "bytes": 1842976,
+      "digest": "591f1fc6ff695d967513100f707e66d5bf731414",
+      "verified": true
+    },
+    "checkpoints/goal/oft/tokenizer.model": {
+      "bytes": 499723,
+      "digest": "22bccbcb41ec929cf0c9dbe8f41036db82e5e773",
+      "verified": true
+    },
+    "checkpoints/goal/oft/tokenizer_config.json": {
+      "bytes": 1192,
+      "digest": "d39defd338dee423ae0a71abfd7ea69a44fb1e52",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_GOAL_lora/README.md": {
+      "bytes": 5162,
+      "digest": "9cd959545ff0efa86f50219ebb80072a90b0562e",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_GOAL_lora/adapter_config.json": {
+      "bytes": 1052,
+      "digest": "c29fa89a2d185bbb00055454bfb0ef5c703bd108",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_GOAL_lora/adapter_model.safetensors": {
+      "bytes": 484458600,
+      "digest": "f7b679b99c55389f3ee80eee2842f6f393a7cd42e054141de4fe16ca2e32d9cc",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_GOAL_lora/openvla_headers.pt": {
+      "bytes": 638046816,
+      "digest": "4766d734cd0e271bb90b04aefc7ef9a457a5df6131c41dcb5473d36037c334b3",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_LONG_lora/README.md": {
+      "bytes": 5211,
+      "digest": "149816e72bccfbf2d8f6661e6f6ba89ccd1d8b4e",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_LONG_lora/adapter_config.json": {
+      "bytes": 1088,
+      "digest": "a0e772d228d713f8d80be8f3c59a784fbe783dd6",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/README.md": {
+      "bytes": 5164,
+      "digest": "eff3c3bc94931f6830e46be335f7200304428082",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_OBJECT_lora/adapter_config.json": {
+      "bytes": 1056,
+      "digest": "78e5cfcc9e4f982beefac56ded40a3d1c4315b76",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/README.md": {
+      "bytes": 5165,
+      "digest": "b2bc81156c10c2f1c7984b0962dfde1398ca64fd",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/ript_adaptors/LIBERO_SPATIAL_lora/adapter_config.json": {
+      "bytes": 1058,
+      "digest": "8bac2e777c3d1f87029e48dea60eae373206a6a1",
+      "verified": true
+    },
+    "checkpoints/ript/openvla_oft/scale_header/LIBERO_GOAL_scale_header.pth": {
+      "bytes": 335805142,
+      "digest": "dc4aca9bf8f629cbf92403c20757d660b140a33beee6afde1d1b8d80bdea2e9e",
+      "verified": true
+    },
+    "checkpoints/long/oft/added_tokens.json": {
+      "bytes": 21,
+      "digest": "8671820d1bb0dfd4dd92d5bd0fa9b5a7773f843e",
+      "verified": true
+    },
+    "checkpoints/long/oft/config.json": {
+      "bytes": 60712,
+      "digest": "42ea81c7c783049559839e305afdfe97e30581a3",
+      "verified": true
+    },
+    "checkpoints/long/oft/configuration_prismatic.py": {
+      "bytes": 5865,
+      "digest": "c2625753c4da1a6ef274a02645d4086bc7a7fb2b",
+      "verified": true
+    },
+    "checkpoints/long/oft/dataset_statistics.json": {
+      "bytes": 2975,
+      "digest": "52e73d28590cd26bca7859fb52915417ffaf92b7",
+      "verified": true
+    },
+    "checkpoints/long/oft/generation_config.json": {
+      "bytes": 136,
+      "digest": "2cefc1e51e6ccfe846d2b509ced403df73a8efe2",
+      "verified": true
+    },
+    "checkpoints/long/oft/model.safetensors.index.json": {
+      "bytes": 94764,
+      "digest": "bd7cc8ff8070ead248023feae55303f5a3b900d1",
+      "verified": true
+    },
+    "checkpoints/long/oft/modeling_prismatic.py": {
+      "bytes": 49029,
+      "digest": "9013a4f57eb18fa770efcbe9d0a1445d6c16bb72",
+      "verified": true
+    },
+    "checkpoints/long/oft/preprocessor_config.json": {
+      "bytes": 1650,
+      "digest": "92975ace548590d24f65f497d7610af3b92b4dcd",
+      "verified": true
+    },
+    "checkpoints/long/oft/processing_prismatic.py": {
+      "bytes": 12718,
+      "digest": "3f2daaf82c3b8946fe57596f656f14a031eaef93",
+      "verified": true
+    },
+    "checkpoints/long/oft/processor_config.json": {
+      "bytes": 130,
+      "digest": "f892f8a8f53e2f3603a7cf86043a1add317c1787",
+      "verified": true
+    },
+    "checkpoints/long/oft/special_tokens_map.json": {
+      "bytes": 552,
+      "digest": "ab75c8e0a22550f0667501a0c52758f071a9efd8",
+      "verified": true
+    },
+    "checkpoints/long/oft/tokenizer.json": {
+      "bytes": 1842976,
+      "digest": "591f1fc6ff695d967513100f707e66d5bf731414",
+      "verified": true
+    },
+    "checkpoints/long/oft/tokenizer.model": {
+      "bytes": 499723,
+      "digest": "22bccbcb41ec929cf0c9dbe8f41036db82e5e773",
+      "verified": true
+    },
+    "checkpoints/long/oft/tokenizer_config.json": {
+      "bytes": 1192,
+      "digest": "d39defd338dee423ae0a71abfd7ea69a44fb1e52",
+      "verified": true
+    },
+    "checkpoints/object/oft/README.md": {
+      "bytes": 2897,
+      "digest": "54d2b7d73a34a46bd1f0aec9ea29320d4a202ed0",
+      "verified": true
+    },
+    "checkpoints/object/oft/added_tokens.json": {
+      "bytes": 21,
+      "digest": "8671820d1bb0dfd4dd92d5bd0fa9b5a7773f843e",
+      "verified": true
+    },
+    "checkpoints/object/oft/config.json": {
+      "bytes": 60712,
+      "digest": "42ea81c7c783049559839e305afdfe97e30581a3",
+      "verified": true
+    },
+    "checkpoints/object/oft/configuration_prismatic.py": {
+      "bytes": 5865,
+      "digest": "c2625753c4da1a6ef274a02645d4086bc7a7fb2b",
+      "verified": true
+    },
+    "checkpoints/object/oft/dataset_statistics.json": {
+      "bytes": 3022,
+      "digest": "4acad75d4471f4384d0f0d00a284ba21efaacca6",
+      "verified": true
+    },
+    "checkpoints/object/oft/generation_config.json": {
+      "bytes": 136,
+      "digest": "2cefc1e51e6ccfe846d2b509ced403df73a8efe2",
+      "verified": true
+    },
+    "checkpoints/object/oft/model.safetensors.index.json": {
+      "bytes": 94764,
+      "digest": "bd7cc8ff8070ead248023feae55303f5a3b900d1",
+      "verified": true
+    },
+    "checkpoints/object/oft/modeling_prismatic.py": {
+      "bytes": 49029,
+      "digest": "9013a4f57eb18fa770efcbe9d0a1445d6c16bb72",
+      "verified": true
+    },
+    "checkpoints/object/oft/preprocessor_config.json": {
+      "bytes": 1650,
+      "digest": "92975ace548590d24f65f497d7610af3b92b4dcd",
+      "verified": true
+    },
+    "checkpoints/object/oft/processing_prismatic.py": {
+      "bytes": 12718,
+      "digest": "3f2daaf82c3b8946fe57596f656f14a031eaef93",
+      "verified": true
+    },
+    "checkpoints/object/oft/processor_config.json": {
+      "bytes": 130,
+      "digest": "f892f8a8f53e2f3603a7cf86043a1add317c1787",
+      "verified": true
+    },
+    "checkpoints/object/oft/special_tokens_map.json": {
+      "bytes": 552,
+      "digest": "ab75c8e0a22550f0667501a0c52758f071a9efd8",
+      "verified": true
+    },
+    "checkpoints/object/oft/tokenizer.json": {
+      "bytes": 1842976,
+      "digest": "591f1fc6ff695d967513100f707e66d5bf731414",
+      "verified": true
+    },
+    "checkpoints/object/oft/tokenizer.model": {
+      "bytes": 499723,
+      "digest": "22bccbcb41ec929cf0c9dbe8f41036db82e5e773",
+      "verified": true
+    },
+    "checkpoints/object/oft/tokenizer_config.json": {
+      "bytes": 1192,
+      "digest": "d39defd338dee423ae0a71abfd7ea69a44fb1e52",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/README.md": {
+      "bytes": 2909,
+      "digest": "9599033bbdf96650cda0daaafeb3eb3348edd843",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/added_tokens.json": {
+      "bytes": 21,
+      "digest": "8671820d1bb0dfd4dd92d5bd0fa9b5a7773f843e",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/config.json": {
+      "bytes": 60711,
+      "digest": "5d288cead81e02ee4f0cfb8fee1a5f153948e812",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/configuration_prismatic.py": {
+      "bytes": 5865,
+      "digest": "c2625753c4da1a6ef274a02645d4086bc7a7fb2b",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/dataset_statistics.json": {
+      "bytes": 2957,
+      "digest": "2746cb5835b4fa4653a59783d9bd382b3d05a119",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/generation_config.json": {
+      "bytes": 136,
+      "digest": "2cefc1e51e6ccfe846d2b509ced403df73a8efe2",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/model.safetensors.index.json": {
+      "bytes": 94764,
+      "digest": "bd7cc8ff8070ead248023feae55303f5a3b900d1",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/modeling_prismatic.py": {
+      "bytes": 49029,
+      "digest": "9013a4f57eb18fa770efcbe9d0a1445d6c16bb72",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/preprocessor_config.json": {
+      "bytes": 1650,
+      "digest": "92975ace548590d24f65f497d7610af3b92b4dcd",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/processing_prismatic.py": {
+      "bytes": 12718,
+      "digest": "3f2daaf82c3b8946fe57596f656f14a031eaef93",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/processor_config.json": {
+      "bytes": 130,
+      "digest": "f892f8a8f53e2f3603a7cf86043a1add317c1787",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/special_tokens_map.json": {
+      "bytes": 552,
+      "digest": "ab75c8e0a22550f0667501a0c52758f071a9efd8",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/tokenizer.json": {
+      "bytes": 1842976,
+      "digest": "591f1fc6ff695d967513100f707e66d5bf731414",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/tokenizer.model": {
+      "bytes": 499723,
+      "digest": "22bccbcb41ec929cf0c9dbe8f41036db82e5e773",
+      "verified": true
+    },
+    "checkpoints/spatial/oft/tokenizer_config.json": {
+      "bytes": 1192,
+      "digest": "d39defd338dee423ae0a71abfd7ea69a44fb1e52",
+      "verified": true
+    }
+  },
+  "normalization": {
+    "goal": "libero_goal_no_noops",
+    "long": "libero_10_no_noops",
+    "object": "libero_object_no_noops",
+    "spatial": "libero_spatial_no_noops"
+  },
+  "eval_exit_regression": [
+    "eval",
+    "aggregate",
+    "barrier",
+    "finish",
+    "destroy"
+  ],
+  "python_parse_and_shell_syntax": true,
+  "scope": "Static, integrity, and stubbed control flow only; not a CUDA runtime test."
+}

@@ -1,0 +1,19 @@
+{
+  "ript-vla": {
+    "url": "https://github.com/Ariostgx/ript-vla.git",
+    "revision": "440990e8864e12e4578b490ff6359e4f2c49ae3e"
+  },
+  "openvla-oft": {
+    "url": "https://github.com/moojink/openvla-oft.git",
+    "revision": "e4287e94541f459edc4feabc4e181f537cd569a8"
+  },
+  "LIBERO": {
+    "url": "https://github.com/Lifelong-Robot-Learning/LIBERO.git",
+    "revision": "8f1084e3132a39270c3a13ebe37270a43ece2a01"
+  },
+  "LIBERO-plus": {
+    "url": "https://github.com/sylvestf/LIBERO-plus.git",
+    "revision": "4976dc30028e805ff8094b55501d532c48fec182",
+    "reference_only": true
+  }
+}

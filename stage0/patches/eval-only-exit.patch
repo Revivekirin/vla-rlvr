@@ -1,0 +1,17 @@
+--- a/train_ript_openvla_oft.py
++++ b/train_ript_openvla_oft.py
+@@ -202,6 +202,14 @@
+         print(f'[RANK {rank}] Rollout results: {rollout_results}')
+         sync_rollout_results_via_file(rollout_results, logger, 0)
+     
++    # Stage 0 compatibility fix: evaluation must not enter training setup.
++    if cfg.algo.eval_only:
++        dist.barrier()
++        if rank == 0:
++            wandb.finish()
++        dist.destroy_process_group()
++        return
++
+     # Synchronize all processes before training starts
+     dist.barrier()
+     
