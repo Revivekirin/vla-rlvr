@@ -1,0 +1,11 @@
+{
+  "status": "NOT_RUN",
+  "suite": "libero_goal",
+  "compatibility": "NOT_ASSESSED",
+  "reason": "Implemented locally; remote execution is reserved for the user. No action comparison has been executed in this continuation.",
+  "target_repository": "/nfs4/jhkim/repos/vla-rlvr",
+  "script": "stage0/scripts/check_action_compatibility.py",
+  "comparisons": null,
+  "gpu_memory": null,
+  "performance_claim": false
+}

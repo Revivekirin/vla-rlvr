@@ -1,6 +1,8 @@
 # Stage 0 — official OpenVLA-OFT / RIPT-VLA integration
 
-**Status: PARTIAL.** Audited 2026-10-21. The official implementation and all released checkpoint components are identified and pinned. Genuine Goal action/scale heads load strictly and run bounded CPU forward passes. Full 7B loading, adapter application, Linux dependency installation, CUDA inference, and simulator execution remain unverified. No full LIBERO evaluation or RL training was run.
+**Current status: PARTIAL — see [READINESS.md](READINESS.md).** The supplied A5000 evidence now verifies genuine Goal GPU inference for SFT, scale-only, and released RIPT. These completed GPU smoke tests were not repeated. New bounded action-compatibility and Original LIBERO runtime validators are implemented; remote execution is reserved for the user. Their evidence files explicitly say `NOT_RUN` until executed. Stage 1 remains pending simulator validation and review of the action comparison; RL training remains not ready.
+
+**Historical audit below:** the initial audit's statements that GPU/full-model execution was unverified have been superseded by `READINESS.md` and `evidence/gpu-goal-*.json`. The original source/checkpoint mappings and training findings remain applicable. No full LIBERO evaluation or RL training was run in this continuation.
 
 ## What is present
 

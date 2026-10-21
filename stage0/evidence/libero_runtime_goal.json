@@ -1,0 +1,15 @@
+{
+  "status": "NOT_RUN",
+  "suite": "libero_goal",
+  "reason": "Implemented locally; remote execution is reserved for the user. No simulator was initialized in this continuation.",
+  "target_repository": "/nfs4/jhkim/repos/vla-rlvr",
+  "script": "stage0/scripts/check_libero_runtime.py",
+  "planned_task_index": 0,
+  "planned_initial_state_index": 0,
+  "planned_settling_steps": 10,
+  "planned_checked_steps": 1,
+  "elapsed_seconds": null,
+  "runtime_errors": null,
+  "cleanup": null,
+  "task_success_rate": null
+}
