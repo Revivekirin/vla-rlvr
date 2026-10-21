@@ -1,0 +1,28 @@
+{
+  "suite": "goal",
+  "mode": "scale",
+  "scope": "Synthetic observation, no environment steps or training",
+  "optimizer_parameter_counts": {
+    "model": 110828288,
+    "header": 151117831
+  },
+  "deterministic": {
+    "shape": [
+      1,
+      8,
+      7
+    ],
+    "finite": true
+  },
+  "stochastic": {
+    "shape": [
+      1,
+      8,
+      7
+    ],
+    "finite": true
+  },
+  "peak_allocated_gib": 15.58174991607666,
+  "peak_reserved_gib": 15.806640625,
+  "gpu": "NVIDIA RTX A5000"
+}

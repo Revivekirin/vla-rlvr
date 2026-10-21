@@ -1,0 +1,12 @@
+{
+  "suite": "goal",
+  "mode": "sft",
+  "scope": "Synthetic observation, no environment steps or training",
+  "shape": [
+    8,
+    7
+  ],
+  "peak_allocated_gib": 14.966351985931396,
+  "peak_reserved_gib": 15.076171875,
+  "gpu": "NVIDIA RTX A5000"
+}

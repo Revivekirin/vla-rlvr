@@ -1,0 +1,19 @@
+Collecting evdev==1.9.3
+  Downloading evdev-1.9.3.tar.gz (32 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: evdev
+  Building wheel for evdev (pyproject.toml): started
+  Building wheel for evdev (pyproject.toml): finished with status 'done'
+  Created wheel for evdev: filename=evdev-1.9.3-cp310-cp310-linux_x86_64.whl size=74225 sha256=173fab145c65a62897a2ad1ac3bc9f189421218bdab24ee4d0261275a562e9b4
+  Stored in directory: /tmp/pip-ephem-wheel-cache-slv0g4o0/wheels/68/70/b4/3fc7b36d0009ccf99b44add24b4bb0427f802ca6f9e525c3be
+Successfully built evdev
+Installing collected packages: evdev
+Successfully installed evdev-1.9.3
+
+[notice] A new release of pip is available: 24.3.1 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
