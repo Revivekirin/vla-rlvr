@@ -1,15 +1,259 @@
 {
-  "status": "NOT_RUN",
+  "status": "PASS",
   "suite": "libero_goal",
-  "reason": "Implemented locally; remote execution is reserved for the user. No simulator was initialized in this continuation.",
-  "target_repository": "/nfs4/jhkim/repos/vla-rlvr",
-  "script": "stage0/scripts/check_libero_runtime.py",
-  "planned_task_index": 0,
-  "planned_initial_state_index": 0,
-  "planned_settling_steps": 10,
-  "planned_checked_steps": 1,
-  "elapsed_seconds": null,
-  "runtime_errors": null,
-  "cleanup": null,
-  "task_success_rate": null
+  "provenance": {
+    "repositories": {
+      "ript-vla": {
+        "url": "https://github.com/Ariostgx/ript-vla.git",
+        "revision": "440990e8864e12e4578b490ff6359e4f2c49ae3e"
+      },
+      "openvla-oft": {
+        "url": "https://github.com/moojink/openvla-oft.git",
+        "revision": "e4287e94541f459edc4feabc4e181f537cd569a8"
+      },
+      "LIBERO": {
+        "url": "https://github.com/Lifelong-Robot-Learning/LIBERO.git",
+        "revision": "8f1084e3132a39270c3a13ebe37270a43ece2a01"
+      },
+      "LIBERO-plus": {
+        "url": "https://github.com/sylvestf/LIBERO-plus.git",
+        "revision": "4976dc30028e805ff8094b55501d532c48fec182",
+        "reference_only": true
+      }
+    },
+    "policy_source_sha256": {
+      "openvla-oft/experiments/robot/openvla_utils.py": "eed754d7c5f9821aae2fe0531dbe01df8c11df0d5c79b4aeeb9bb4452124bdf5",
+      "openvla-oft/experiments/robot/libero/run_libero_eval.py": "701a20b6ca2942aa36e0e7d567b25647268b936a23af79c5893534f10bec7802",
+      "openvla-oft/experiments/robot/libero/libero_utils.py": "489c16dc8220845b2936ddb81aafd7469061d2009b0edddb2f85703bc51a204f",
+      "openvla-oft/prismatic/extern/hf/modeling_prismatic.py": "b5431a074c0025a12e46dc954a5e18d1d73477babb5ae42e3a12ab4b907f33a6",
+      "ript-vla/ript/algos/rl_optimizers/openvla_oft_interface.py": "2c373eac7311344a8aee545aaca0b11fe1aefc235437d947bca0326e1c22d97c",
+      "ript-vla/ript/env_runner/openvla_oft_libero_runner.py": "adbadbe2f9c3af89e3e6435992b3f0a01400747bcd4cf71a2690dc5259eb33eb"
+    },
+    "package_versions": {
+      "torch": "2.2.0+cu121",
+      "transformers": "4.40.1",
+      "peft": "0.11.1",
+      "mujoco": "3.1.6",
+      "robosuite": "1.4.1",
+      "numpy": "1.26.4",
+      "tensorflow": "2.15.0"
+    },
+    "python": "3.10.14 (main, May  6 2024, 19:42:50) [GCC 11.2.0]",
+    "mujoco_gl": "egl"
+  },
+  "task_index": 0,
+  "initial_state_index": 0,
+  "scope": "One reset, ten official settling steps, one checked action; no success-rate evaluation",
+  "action_steps": 11,
+  "cleanup": {
+    "attempted": true,
+    "completed": true
+  },
+  "task_name": "open_the_middle_drawer_of_the_cabinet",
+  "instruction": "open the middle drawer of the cabinet",
+  "initial_state_file": "/nfs4/jhkim/repos/vla-rlvr/vendor/LIBERO/libero/libero/init_files/libero_goal/open_the_middle_drawer_of_the_cabinet.pruned_init",
+  "initial_state_sha256": "977efe1216bee72bb4e9fa9ec4be1bcfe37fb00ece815eac117feba019b34b9f",
+  "environment": {
+    "factory": "experiments.robot.libero.libero_utils.get_libero_env",
+    "controller": "OSC_POSE",
+    "control_freq": 20,
+    "camera_names": [
+      "agentview",
+      "robot0_eye_in_hand"
+    ],
+    "resolution": 256,
+    "seed": 0,
+    "renderer": "official OffScreenRenderEnv defaults"
+  },
+  "reset_observations": {
+    "agentview_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eye_in_hand_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eef_pos": {
+      "shape": [
+        3
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_eef_quat": {
+      "shape": [
+        4
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_gripper_qpos": {
+      "shape": [
+        2
+      ],
+      "dtype": "float64",
+      "finite": true
+    }
+  },
+  "fixed_state_observations": {
+    "agentview_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eye_in_hand_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eef_pos": {
+      "shape": [
+        3
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_eef_quat": {
+      "shape": [
+        4
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_gripper_qpos": {
+      "shape": [
+        2
+      ],
+      "dtype": "float64",
+      "finite": true
+    }
+  },
+  "settled_observations": {
+    "agentview_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eye_in_hand_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eef_pos": {
+      "shape": [
+        3
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_eef_quat": {
+      "shape": [
+        4
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_gripper_qpos": {
+      "shape": [
+        2
+      ],
+      "dtype": "float64",
+      "finite": true
+    }
+  },
+  "observation_snapshot": {
+    "path": "/nfs4/jhkim/repos/vla-rlvr/stage0/evidence/libero_goal_observation.npz",
+    "sha256": "c0abd8507280371abbffa35bd01fe12bf872554d740ad9f36f7579cd95f738d2",
+    "preprocessing": "Official prepare_observation: rotate both cameras 180 degrees, resize to 224, pos+axisangle+gripper; no crop or normalization yet"
+  },
+  "post_step_observations": {
+    "agentview_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eye_in_hand_image": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8",
+      "finite": true
+    },
+    "robot0_eef_pos": {
+      "shape": [
+        3
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_eef_quat": {
+      "shape": [
+        4
+      ],
+      "dtype": "float64",
+      "finite": true
+    },
+    "robot0_gripper_qpos": {
+      "shape": [
+        2
+      ],
+      "dtype": "float64",
+      "finite": true
+    }
+  },
+  "step": {
+    "action": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "convention": "Environment OSC_POSE delta pose + gripper; official dummy action already in environment convention",
+    "reward": 0.0,
+    "done": false,
+    "check_success": false,
+    "expected_sparse_reward": 0.0,
+    "info_type": "dict",
+    "sim_time_before": 0.5000000000000003,
+    "sim_time_after": 0.5500000000000004
+  },
+  "elapsed_seconds": 31.79028712598665,
+  "exit_code": 0,
+  "log": "/nfs4/jhkim/repos/vla-rlvr/stage0/evidence/libero_runtime_goal.log"
 }

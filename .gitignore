@@ -5,4 +5,4 @@ data/
 outputs/
 __pycache__/
 *.partial
-evidence/*
+stage0/evidence/*
