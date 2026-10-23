@@ -167,3 +167,10 @@ python stage0/scripts/check_components.py
 ```
 
 Stage 0 remains **PARTIAL** until target dependencies, complete checkpoint loading, and bounded genuine-policy GPU inference are verified. Additional training defects are recorded as a separate unresolved boundary; Stage 0 does not silently change the released algorithm to make training appear validated.
+
+## 서버 공통 실행 환경
+
+Original LIBERO도 파일 핸들 제한을 적용받습니다. Conda 활성화, EGL/offline 설정,
+soft 파일 핸들 한도를 자동 적용하려면 `bash experiments/server_env.sh original COMMAND ...`를 사용합니다.
+서버 최초 설치, 실행 명령과 파일 구조는 [LIBERO-Plus 서버 실행 안내](../experiments/libero_plus/README.md)를 참고하세요.
+기존 nominal 결과는 재실행하지 않아도 되며, `run.py --execute`는 같은 suite/mode의 evidence 로그를 덮어쓸 수 있습니다.
