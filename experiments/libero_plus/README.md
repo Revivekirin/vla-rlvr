@@ -269,6 +269,7 @@ Original 런처에는 Plus의 task별 resume 기능이 없다. 기본 timeout은
 │   └── libero_plus/
 │       ├── README.md                  # 이 문서
 │       ├── evaluate.py                # Plus 평가, 저장/재개
+│       ├── resume_bounded.py          # 100 task마다 평가 프로세스 교체
 │       ├── report.py                  # 실제 counts로 비교 보고서 생성
 │       ├── test_report.py             # 가벼운 parsing/aggregation 테스트
 │       └── comparison.md              # nominal / OOD 비교 보고서
@@ -314,3 +315,39 @@ Original 런처에는 Plus의 task별 resume 기능이 없다. 기본 timeout은
 
 이 래퍼는 공통 환경 설정만 추가한다. 현재 평가 Python 코드와 manifest hash는
 변경하지 않으므로 기존 결과를 그대로 재개할 수 있다.
+
+## 7. mesh 파일 FD 누적에 따른 프로세스 교체
+
+server4에서 SFT 약 340 task 진행 시 33,697개 FD가 관측됐다. 동일한 Panda
+`.obj` 파일이 각각 673번 열려 있었다. MuJoCo 3.1.6 / robosuite 1.4.1의
+환경 종료 경로까지 확인했지만, 라이브러리 내 정확한 누수 지점은 미확정이다.
+soft limit 증가는 FD 누적을 해결하지 않는다.
+
+`resume_bounded.py`는 **기존 evaluate.py를 수정하지 않고**, 기본 100개 task를
+완료할 때마다 해당 평가 프로세스를 종료한 다음 동일 명령을 새 프로세스로
+재시작한다. 완료된 JSON만 진행 상황으로 계산한다. 중단 시 진행 중이던
+1개 task는 저장되지 않을 수 있으며 새 프로세스가 다시 실행한다.
+기존 manifest의 evaluator hash, 체크포인트, 완료 결과는 유지된다.
+매 재시작마다 모델을 다시 로드하므로 실행 시간은 조금 늘어난다.
+
+현재 동일 모델 evaluator가 실행 중이라면 먼저 그 터미널에서 Ctrl+C로
+종료하고, `ps`로 해당 evaluator가 종료됐는지 확인한다. 동시 실행하지 않는다.
+그 후 다음 명령으로 SFT를 재개한다:
+
+```bash
+cd /nfs4/jhkim/repos/vla-rlvr
+mkdir -p outputs/libero-plus/logs
+set -o pipefail
+bash experiments/server_env.sh plus python -u experiments/libero_plus/resume_bounded.py --model sft --seed 1 --tasks-per-process 100 2>&1 | tee -a outputs/libero-plus/logs/sft-seed1.log
+```
+
+Scale/RIPT도 같은 감독 방식을 적용한다:
+
+```bash
+bash experiments/server_env.sh plus python -u experiments/libero_plus/resume_bounded.py --model scale --seed 1 --tasks-per-process 100 2>&1 | tee -a outputs/libero-plus/logs/scale-seed1.log
+bash experiments/server_env.sh plus python -u experiments/libero_plus/resume_bounded.py --model ript --seed 1 --tasks-per-process 100 2>&1 | tee -a outputs/libero-plus/logs/ript-seed1.log
+```
+
+Scale/RIPT 첫 실행에서는 감독 스크립트가 기존 평가기를 시작하고 각 모델의
+manifest를 만든다. 기존 manifest가 있으면 설정을 확인한 뒤 완료된 결과부터
+이어간다.
