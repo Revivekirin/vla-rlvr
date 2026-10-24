@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import resource
 import signal
 import subprocess
 import sys
@@ -21,7 +22,7 @@ def main():
     parser.add_argument('--model', choices=('sft', 'scale', 'ript'), required=True)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--tasks-per-process', type=int, default=100)
-    parser.add_argument('--max-open-files', type=int, default=8192)
+    parser.add_argument('--max-open-files', type=int, default=262144)
     parser.add_argument('--poll-seconds', type=float, default=2)
     args = parser.parse_args()
     if args.tasks_per_process < 1 or args.max_open_files < 1 or args.poll_seconds <= 0:
@@ -41,7 +42,12 @@ def main():
                '--model', args.model, '--seed', str(args.seed), '--execute']
     while completed(folder) < total:
         before = completed(folder)
-        print(f'Starting {args.model}: {before}/{total} complete', flush=True)
+        soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        fd_threshold = min(args.max_open_files, soft_limit // 2)
+        if fd_threshold < 1:
+            raise SystemExit(f'Invalid open-file soft limit: {soft_limit}')
+        print(f'Starting {args.model}: {before}/{total} complete; '
+              f'FD soft={soft_limit} hard={hard_limit} restart={fd_threshold}', flush=True)
         child = subprocess.Popen(command, cwd=ROOT, start_new_session=True)
         interrupted_for_restart = False
         try:
@@ -52,12 +58,12 @@ def main():
                     open_files = len(os.listdir(f'/proc/{child.pid}/fd'))
                 except (FileNotFoundError, ProcessLookupError):
                     open_files = 0  # Child has exited; status is checked below.
-                threshold = now - before >= args.tasks_per_process or open_files >= args.max_open_files
+                threshold = now - before >= args.tasks_per_process or open_files >= fd_threshold
                 if threshold and now < total and child.poll() is None:
                     if now == before:
                         os.killpg(child.pid, signal.SIGTERM)
                         child.wait()
-                        raise SystemExit(f'FD limit {args.max_open_files} reached before a task completed; '
+                        raise SystemExit(f'FD restart threshold {fd_threshold} reached before a task completed; '
                                          'cannot make progress safely')
                     print(f'Restarting to release mesh FDs: {now}/{total} complete; '
                           f'open FDs={open_files}', flush=True)
