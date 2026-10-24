@@ -21,10 +21,11 @@ def main():
     parser.add_argument('--model', choices=('sft', 'scale', 'ript'), required=True)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--tasks-per-process', type=int, default=100)
+    parser.add_argument('--max-open-files', type=int, default=8192)
     parser.add_argument('--poll-seconds', type=float, default=2)
     args = parser.parse_args()
-    if args.tasks_per_process < 1 or args.poll_seconds <= 0:
-        parser.error('tasks-per-process and poll-seconds must be positive')
+    if args.tasks_per_process < 1 or args.max_open_files < 1 or args.poll_seconds <= 0:
+        parser.error('tasks-per-process, max-open-files and poll-seconds must be positive')
     folder = ROOT / 'outputs/libero-plus' / args.model / f'seed-{args.seed}'
     manifest = folder / 'manifest.json'
     if manifest.is_file():
@@ -47,8 +48,19 @@ def main():
             while child.poll() is None:
                 time.sleep(args.poll_seconds)
                 now = completed(folder)
-                if now - before >= args.tasks_per_process and now < total:
-                    print(f'Restarting to release mesh FDs: {now}/{total} complete', flush=True)
+                try:
+                    open_files = len(os.listdir(f'/proc/{child.pid}/fd'))
+                except (FileNotFoundError, ProcessLookupError):
+                    open_files = 0  # Child has exited; status is checked below.
+                threshold = now - before >= args.tasks_per_process or open_files >= args.max_open_files
+                if threshold and now < total and child.poll() is None:
+                    if now == before:
+                        os.killpg(child.pid, signal.SIGTERM)
+                        child.wait()
+                        raise SystemExit(f'FD limit {args.max_open_files} reached before a task completed; '
+                                         'cannot make progress safely')
+                    print(f'Restarting to release mesh FDs: {now}/{total} complete; '
+                          f'open FDs={open_files}', flush=True)
                     # Finished JSON files survive; a task in flight will be retried.
                     os.killpg(child.pid, signal.SIGTERM)
                     interrupted_for_restart = True

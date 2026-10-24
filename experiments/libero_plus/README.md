@@ -324,11 +324,14 @@ server4에서 SFT 약 340 task 진행 시 33,697개 FD가 관측됐다. 동일�
 soft limit 증가는 FD 누적을 해결하지 않는다.
 
 `resume_bounded.py`는 **기존 evaluate.py를 수정하지 않고**, 기본 100개 task를
-완료할 때마다 해당 평가 프로세스를 종료한 다음 동일 명령을 새 프로세스로
-재시작한다. 완료된 JSON만 진행 상황으로 계산한다. 중단 시 진행 중이던
+완료하거나 해당 프로세스의 열린 FD가 8,192개에 도달하면 평가 프로세스를
+종료한 다음 동일 명령을 새 프로세스로 재시작한다. 완료된 JSON만 진행 상황으로 계산한다. 중단 시 진행 중이던
 1개 task는 저장되지 않을 수 있으며 새 프로세스가 다시 실행한다.
 기존 manifest의 evaluator hash, 체크포인트, 완료 결과는 유지된다.
 매 재시작마다 모델을 다시 로드하므로 실행 시간은 조금 늘어난다.
+FD 감시 기본값은 `--max-open-files 8192`이며 `/proc/<pid>/fd`에서 직접
+측정한다. 재시작 직후 task를 하나도 완료하기 전에 FD 임계치에 도달하면
+무한 재시작을 막기 위해 오류로 종료한다.
 
 현재 동일 모델 evaluator가 실행 중이라면 먼저 그 터미널에서 Ctrl+C로
 종료하고, `ps`로 해당 evaluator가 종료됐는지 확인한다. 동시 실행하지 않는다.
@@ -351,3 +354,8 @@ bash experiments/server_env.sh plus python -u experiments/libero_plus/resume_bou
 Scale/RIPT 첫 실행에서는 감독 스크립트가 기존 평가기를 시작하고 각 모델의
 manifest를 만든다. 기존 manifest가 있으면 설정을 확인한 뒤 완료된 결과부터
 이어간다.
+
+2026-10-24에 SFT task 1943 완료 후 새 환경 생성에서 `Too many open files`가
+재발했다. 감독 스크립트에 FD 수 임계치 감시를 추가했다. 실제 실행에서는
+새 스크립트를 배포한 뒤 `--max-open-files 8192`로 재개한다. 첫 재개 전에
+누락 메시지에 나온 Plus asset `assets/new_objects/box_of_yogurt/jkemqc/usd/MJCF/collision/visuals057.obj`가 존재하는지 확인한다.
