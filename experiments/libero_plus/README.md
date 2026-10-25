@@ -206,3 +206,9 @@ tail -n 40 -F outputs/libero-plus/logs/sft-seed1.log
 
 공식 자료: [LIBERO-Plus 코드와 프로토콜](https://github.com/sylvestf/LIBERO-plus/tree/4976dc30028e805ff8094b55501d532c48fec182),
 [공식 assets](https://huggingface.co/datasets/Sylvest/LIBERO-plus/tree/dd2bd61b7d9a6fef1abc52d606e983b41886a149).
+
+최종 task JSON이 저장된 직후 Linux가 종료 중인 자식 프로세스의
+`/proc/<pid>/fd` 접근을 거부할 수 있다. 감독 스크립트는 완료 개수를 먼저
+확인하고 이 경우 FD 조회를 건너뛴다. `PermissionError`도 종료 중 상태로
+처리한다. 해당 오류로 SFT가 이미 2,591/2,591 저장됐다면 재실행 시
+`All tasks already complete`로 종료하며 다음 모델을 실행할 수 있다.

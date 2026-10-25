@@ -54,10 +54,14 @@ def main():
             while child.poll() is None:
                 time.sleep(args.poll_seconds)
                 now = completed(folder)
+                if now >= total:
+                    # The final JSON is durable; wait for normal evaluator exit.
+                    # Linux may deny /proc/<pid>/fd during process teardown.
+                    continue
                 try:
                     open_files = len(os.listdir(f'/proc/{child.pid}/fd'))
-                except (FileNotFoundError, ProcessLookupError):
-                    open_files = 0  # Child has exited; status is checked below.
+                except (FileNotFoundError, ProcessLookupError, PermissionError):
+                    open_files = 0  # Child is exiting or procfs hides its descriptors.
                 threshold = now - before >= args.tasks_per_process or open_files >= fd_threshold
                 if threshold and now < total and child.poll() is None:
                     if now == before:
