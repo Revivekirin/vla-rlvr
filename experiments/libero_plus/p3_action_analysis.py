@@ -313,11 +313,13 @@ def setup(run, metadata, role):
                       HF_MODULES_CACHE=str(run / ('hf-modules-' + role)))
     sys.path[:0] = [str(plus), str(ROOT / 'runtime/openvla-oft'), str(ROOT / 'runtime/ript-vla')]
     os.chdir(run)
+    print(f'[{role}] Config saved; importing torch and evaluator dependencies', flush=True)
     import torch
     from experiments.robot.libero import run_libero_eval as oft
     from experiments.robot import openvla_utils
     openvla_utils.update_auto_map = lambda _: None
     openvla_utils.check_model_logic_mismatch = lambda _: None
+    print(f'[{role}] Imports complete; checking CUDA visibility', flush=True)
     require(torch.cuda.is_available(), 'CUDA required; refusing CPU model load')
     oft.set_seed_everywhere(metadata['seed'])
     return torch, oft
@@ -590,17 +592,60 @@ def verify_provenance(metadata):
     require(task_mapping(Path(metadata['plus'])) == metadata['task_mapping'], 'Mapping changed')
 
 
+def run_status(run):
+    required = ('metadata.json', 'observations.npz', 'capture.json')
+    missing = [name for name in required if not (run / name).is_file()]
+    return dict(run=str(run), exists=run.exists(), capture_artifacts_present=not missing,
+                missing_capture_files=missing,
+                note='Artifact presence only; this does not prove validity or whether a worker is still running.',
+                logs=[str(p) for p in sorted(run.glob('*.log'))],
+                worker_exits={p.name: read_json(p) for p in sorted(run.glob('*-exit.json'))})
+
+
+def require_capture(run):
+    status = run_status(run)
+    require(status['capture_artifacts_present'],
+            f"Capture incomplete: missing {', '.join(status['missing_capture_files'])}. "
+            f"Check the running capture process and {run / 'capture.log'} "
+            "(older versions did not save logs). Do not run compare yet. "
+            "After a failed capture, preserve this directory and use a new run ID.")
+
+
+def run_logged(cmd, run, label):
+    log = run / f'{label}.log'
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1', PYTHONUNBUFFERED='1')
+    print(f'Worker log: {log}', flush=True)
+    with log.open('x', buffering=1) as stream:
+        stream.write('Command: ' + json.dumps(cmd) + '\n')
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, errors='replace', env=env, cwd=run) as child:
+            try:
+                for line in child.stdout:
+                    stream.write(line)
+                    print(line, end='', flush=True)
+                code = child.wait()
+            except BaseException:
+                child.terminate()
+                try:
+                    child.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait()
+                raise
+    save_json(run / f'{label}-exit.json', dict(returncode=code, log=str(log)))
+    require(code == 0, f'{label} worker exited with code {code}; see {log}. Preserve this run and diagnose the log before retrying.')
+
+
 def launch(args, run, command, model=None):
-    cmd = [sys.executable, str(Path(__file__).resolve()), command, '--run-id', args.run_id]
+    cmd = [sys.executable, '-u', str(Path(__file__).resolve()), command, '--run-id', args.run_id]
     if model:
         cmd += ['--model', model]
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
-    subprocess.run(cmd, check=True, env=env, cwd=run)
+    run_logged(cmd, run, 'capture' if command == '_capture' else 'replay-' + model)
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('operation', choices=('dry-run', 'capture', 'compare', 'validate', '_capture', '_replay'))
+    p.add_argument('operation', choices=('dry-run', 'status', 'capture', 'compare', 'validate', '_capture', '_replay'))
     p.add_argument('--run-id', required=True)
     p.add_argument('--source', choices=MODELS, default='scale')
     p.add_argument('--model', choices=MODELS)
@@ -614,9 +659,17 @@ def main():
     args.plus, args.candidates, args.results = (x.resolve() for x in (args.plus, args.candidates, args.results))
     require(1 <= args.horizon <= 300, 'Horizon must be 1..300')
     run = run_path(args.run_id)
+    if args.operation == 'status':
+        print(json.dumps(run_status(run), indent=2))
+        return 0
+    if args.operation == 'capture':
+        require(not run.exists(), f'Run exists: {run}. Use status to inspect it; preserve it and choose a new run ID after a failed capture.')
     if args.operation in ('dry-run', 'capture'):
         plan = preflight(args)
         if args.operation == 'dry-run':
+            plan['ready_meaning'] = 'CPU prerequisites only; not evidence of a completed capture or GPU runtime readiness'
+            plan['run_state'] = run_status(run)
+            plan['capture_can_start'] = plan['ready'] and not run.exists()
             print(json.dumps(plan, indent=2))
             return 0 if plan['ready'] else 2
         require(plan['ready'], json.dumps(plan['errors']))
@@ -648,6 +701,7 @@ def main():
         require(args.model in MODELS, '_replay requires --model')
         replay_worker(args, run, metadata)
     else:
+        require_capture(run)
         verify_provenance(metadata)
         load_observations(run, metadata)  # CPU validation precedes either GPU worker.
         if args.operation == 'compare':

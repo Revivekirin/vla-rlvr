@@ -1,5 +1,7 @@
 """CPU-only P3-A1 tests. No policy, torch, simulator, or GPU imports."""
 import copy
+import contextlib
+import io
 import csv
 import json
 from pathlib import Path
@@ -262,6 +264,38 @@ class AnalysisTests(unittest.TestCase):
             np.testing.assert_array_equal(data['step'], [0, 0, 8])
             np.testing.assert_array_equal(data['executed_count'], [1, 8, 8])
             self.assertEqual([e['reproduction'] for e in capture['episodes']], ['matched', 'not_verified_truncated'])
+
+    def test_incomplete_capture_has_actionable_status(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            p3.save_json(run / 'metadata.json', {})
+            (run / 'config-capture').mkdir()
+            status = p3.run_status(run)
+            self.assertFalse(status['capture_artifacts_present'])
+            self.assertEqual(status['missing_capture_files'], ['observations.npz', 'capture.json'])
+            with self.assertRaisesRegex(ValueError, 'Do not run compare yet'):
+                p3.require_capture(run)
+            self.assertEqual(sorted(p.name for p in run.iterdir()), ['config-capture', 'metadata.json'])
+
+    def test_worker_failure_saves_stdout_stderr_and_exit_code(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            cmd = [sys.executable, '-u', '-c', "import sys; print('started'); print('original failure', file=sys.stderr); sys.exit(7)"]
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(ValueError, 'code 7'):
+                p3.run_logged(cmd, run, 'capture')
+            log = (run / 'capture.log').read_text()
+            self.assertIn('started', log)
+            self.assertIn('original failure', log)
+            self.assertEqual(p3.read_json(run / 'capture-exit.json')['returncode'], 7)
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(FileExistsError):
+                p3.run_logged(cmd, run, 'capture')
+
+    def test_worker_success_records_exit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            with contextlib.redirect_stdout(io.StringIO()):
+                p3.run_logged([sys.executable, '-c', "print('finished')"], run, 'replay-scale')
+            self.assertEqual(p3.read_json(run / 'replay-scale-exit.json')['returncode'], 0)
 
     def test_run_path_rejects_traversal(self):
         for name in ('../other', '/tmp/escape', '.', 'x/y'):
