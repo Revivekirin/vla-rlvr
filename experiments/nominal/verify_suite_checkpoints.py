@@ -69,9 +69,12 @@ def main():
     with torch.inference_mode():
         x=torch.zeros(1,56,4096)
         mu,logscale=action.predict_action(x),scale(x)
-        require(mu.shape==(1,8,7) and logscale.shape==(1,7) and
+        require(mu.shape==(1,8,7) and logscale.shape==(1,8,7) and
                 torch.isfinite(mu).all().item() and torch.isfinite(logscale).all().item(),
-                'Action/scale head shape or finite-value mismatch')
+                f'Action/scale head shape or finite-value mismatch: '
+                f'action={tuple(mu.shape)}, log_scale={tuple(logscale.shape)}, '
+                f'action_finite={torch.isfinite(mu).all().item()}, '
+                f'log_scale_finite={torch.isfinite(logscale).all().item()}')
     adapter=adapter_shapes(Path(paths['adapter'])/'adapter_model.safetensors')
     checked=[base/status['action_head'],base/status['proprio_projector'],
              Path(paths['scale']),Path(paths['rl_heads']),
@@ -79,7 +82,7 @@ def main():
              Path(paths['adapter'])/'adapter_config.json']
     result={'suite':a.suite,'normalization_key':status['norm_key'],'strict_action_load':True,
             'strict_scale_load':True,'strict_rl_header_load':True,
-            'action_shape':[1,8,7],'log_scale_shape':[1,7],
+            'action_shape':[1,8,7],'log_scale_shape':[1,8,7],
             'adapter':adapter,'checked_sha256':{str(p):sha(p) for p in checked},
             'scope':'CPU component shapes; end-to-end cached inference requires GPU smoke'}
     out=ROOT/'outputs/checkpoint_provenance'/f'{a.suite}_compatibility.json'
