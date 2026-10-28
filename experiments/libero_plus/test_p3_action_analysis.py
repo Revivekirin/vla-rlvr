@@ -209,10 +209,11 @@ class AnalysisTests(unittest.TestCase):
             run.mkdir()
             entries = [dict(id=i, name=f'task{i}', category=p3.SHIFT) for i in (1, 2)]
             tasks = [SimpleNamespace(name=f'task{i}', problem_folder='libero_goal',
-                                     bddl_file=f'{i}.bddl', init_states_file=f'{i}.pruned_init') for i in (1, 2)]
+                                     bddl_file=f'{i}_view_1_15_100_0_0_initstate_0.bddl', init_states_file=f'{i}_view_1_15_100_0_0_initstate_0.pruned_init') for i in (1, 2)]
             for task in tasks:
                 for kind, name in [('bddl_files', task.bddl_file), ('init_files', task.init_states_file)]:
-                    path = plus / 'libero/libero' / kind / task.problem_folder / name
+                    physical_name = name.split('_view_')[0] + '.' + name.split('.')[-1]
+                    path = plus / 'libero/libero' / kind / task.problem_folder / physical_name
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text('test fixture')
             suite = SimpleNamespace(n_tasks=2, get_task=lambda i: tasks[i], get_task_init_states=lambda i: [np.zeros(3)])
@@ -239,6 +240,7 @@ class AnalysisTests(unittest.TestCase):
                     self.closed = True
             def make_env(task, family, resolution):
                 self.assertEqual(resolution, 256)
+                self.assertIn('_view_1_15_100_0_0_initstate_0', task.bddl_file)
                 env = Env(task.name == 'task1')
                 environments.append(env)
                 return env, task.name
@@ -297,10 +299,43 @@ class AnalysisTests(unittest.TestCase):
                 p3.run_logged([sys.executable, '-c', "print('finished')"], run, 'replay-scale')
             self.assertEqual(p3.read_json(run / 'replay-scale-exit.json')['returncode'], 0)
 
+    def test_camera_virtual_names_resolve_without_creating_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            plus = Path(folder)
+            base = 'open_the_middle_drawer_of_the_cabinet'
+            expected = []
+            for kind, suffix in [('bddl_files', '.bddl'), ('init_files', '.pruned_init')]:
+                path = plus / 'libero/libero' / kind / 'libero_goal' / (base + suffix)
+                path.parent.mkdir(parents=True)
+                path.write_text('physical fixture')
+                expected.append(path)
+            for angle in (1, 9):  # User-reported task IDs 698 and 705.
+                virtual = base + f'_view_{angle}_15_100_0_0_initstate_0'
+                actual = p3.physical_task_inputs(plus, 'libero_goal', virtual + '.bddl', virtual + '.pruned_init')
+                self.assertEqual(actual, expected)
+                self.assertFalse((expected[0].parent / (virtual + '.bddl')).exists())
+            expected[1].unlink()  # Remove only a temporary synthetic fixture.
+            with self.assertRaisesRegex(ValueError, 'Missing physical task input'):
+                p3.physical_task_inputs(plus, 'libero_goal', virtual + '.bddl', virtual + '.pruned_init')
+
     def test_run_path_rejects_traversal(self):
         for name in ('../other', '/tmp/escape', '.', 'x/y'):
             with self.assertRaises(ValueError):
                 p3.run_path(name)
+
+    def test_preflight_rejects_missing_plus_image_packages(self):
+        with tempfile.TemporaryDirectory() as folder:
+            args = SimpleNamespace(seed=1, source='scale', horizon=300,
+                                   plus=Path(folder), candidates=Path(folder) / 'missing.csv')
+            with patch.object(p3, 'check_revision'), patch.object(p3, 'task_mapping', return_value=[]), \
+                 patch.object(p3, 'checkpoint_files', return_value={}), \
+                 patch.object(p3, 'norm_spec', return_value=('test', STATS)), \
+                 patch.object(p3, 'verify_ordering', return_value={}), \
+                 patch.object(p3.importlib.util, 'find_spec', side_effect=lambda name: None if name in ('wand', 'skimage') else object()):
+                result = p3.preflight(args)
+            self.assertFalse(result['ready'])
+            self.assertIn('Missing dependency: wand', result['errors'])
+            self.assertIn('Missing dependency: skimage', result['errors'])
 
     def test_preflight_does_not_import_torch(self):
         self.assertNotIn('torch', sys.modules)

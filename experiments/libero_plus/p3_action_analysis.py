@@ -223,6 +223,26 @@ def verify_ordering():
                 evidence={str(p): sha(p) for p in (osc, arm)})
 
 
+def physical_task_inputs(plus, folder, bddl_file, init_file):
+    """Resolve Camera virtual filenames for validation only; never alter the Task.
+
+    Mirrors pinned Plus ControlEnv.__init__ and Benchmark.get_task_init_states.
+    The Camera smoke uses the _view_ branch, not the other perturbation branches.
+    """
+    if '_view_' in bddl_file:
+        require('_initstate_' in bddl_file, 'Malformed Camera BDDL identifier')
+        bddl_file = bddl_file.split('_view_')[0] + '.bddl'
+    if '_view_' in init_file:
+        require('_language_' not in init_file, 'Mixed Language/Camera task outside this smoke')
+        init_file = init_file.split('_view_')[0] + '.' + init_file.split('.')[-1]
+    root = plus / 'libero/libero'
+    paths = [root / 'bddl_files' / folder / bddl_file,
+             root / 'init_files' / folder / init_file]
+    for path in paths:
+        require(path.is_file(), f'Missing physical task input: {path}')
+    return paths
+
+
 def preflight(args):
     """No torch/model/environment imports. Aggregate failures for a useful dry run."""
     result = dict(ready=False, errors=[], seed=args.seed, source=args.source, horizon=args.horizon)
@@ -237,7 +257,7 @@ def preflight(args):
             result[key] = fn()
         except Exception as e:
             result['errors'].append(f'{key}: {e}')
-    for dep in ('numpy', 'torch', 'transformers', 'peft', 'tensorflow', 'mujoco'):
+    for dep in ('numpy', 'torch', 'transformers', 'peft', 'tensorflow', 'mujoco', 'wand', 'skimage'):
         if importlib.util.find_spec(dep) is None:
             result['errors'].append(f'Missing dependency: {dep}')
     try:
@@ -245,6 +265,11 @@ def preflight(args):
         if 'mapping' in result:
             result['cases'] = select_cases(args.candidates, result['mapping'], args.results, args.seed, args.id_column)
             require((args.plus / 'libero/libero/assets').is_dir(), 'Missing Plus assets directory')
+            result['physical_task_inputs'] = {}
+            for case in result['cases']:
+                name = case['task']['name']
+                paths = physical_task_inputs(args.plus, SUITE, name + '.bddl', name + '.pruned_init')
+                result['physical_task_inputs'][str(case['task']['id'])] = [str(path) for path in paths]
             for model in MODELS:
                 path = args.results / model / f'seed-{args.seed}' / 'manifest.json'
                 m = read_json(path)
@@ -390,9 +415,8 @@ def capture_worker(args, run, metadata):
     task_files = {}
     for case in metadata['cases']:
         task = suite.get_task(case['task']['id'] - 1)
-        for folder, filename in [('bddl_files', task.bddl_file), ('init_files', task.init_states_file)]:
-            path = Path(metadata['plus']) / 'libero/libero' / folder / task.problem_folder / filename
-            require(path.is_file(), f'Missing task initialization: {path}')
+        for path in physical_task_inputs(Path(metadata['plus']), task.problem_folder,
+                                         task.bddl_file, task.init_states_file):
             task_files[str(path)] = sha(path)
     predict, info = load_policy(metadata['source'], metadata)
     rows, episodes = [], []
@@ -675,6 +699,8 @@ def main():
         require(plan['ready'], json.dumps(plan['errors']))
         require(not run.exists(), 'Run exists; choose a new run ID')
         paths = set(plan['action_order']['evidence']) | set(sum(plan['checkpoints'].values(), [])) | {str(ROOT / f) for f in IMPL} | {str(args.candidates)}
+        for files in plan['physical_task_inputs'].values():
+            paths.update(files)
         for case in plan['cases']:
             paths.update(v['path'] for v in case['evaluation'].values())
         for model in MODELS:
@@ -684,6 +710,7 @@ def main():
                         seed=args.seed, source=args.source, horizon=args.horizon, cases=plan['cases'],
                         normalization_key=plan['normalization'][0], normalization=plan['normalization'][1],
                         checkpoint_paths=plan['checkpoints'], action_order=plan['action_order'],
+                        physical_task_inputs=plan['physical_task_inputs'],
                         task_mapping=task_mapping(args.plus), file_sha256={path: sha(path) for path in sorted(paths)},
                         protocol=dict(initial_state_index=0, wait_steps=10, env_seed=0, image_resolution=256,
                                       policy_resolution=224, center_crop=True, sampling=False, chunk_shape=[8, 7]),
