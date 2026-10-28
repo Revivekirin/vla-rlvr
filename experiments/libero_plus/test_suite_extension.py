@@ -1,6 +1,7 @@
 """CPU-only suite guards. No simulator, model import or network access."""
 import json
 from pathlib import Path
+import struct
 import sys
 import tempfile
 import unittest
@@ -9,9 +10,32 @@ from types import SimpleNamespace
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from experiments.libero_plus import suite_common as c, suite_report as r
 from experiments.nominal import checkpoint_sync as sync
+from experiments.nominal.verify_suite_checkpoints import adapter_shapes
 
 
 class SuiteTests(unittest.TestCase):
+    def test_lora_rank_accepts_linear_and_convolution_pairs(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t)
+            (root/'adapter_config.json').write_text(json.dumps({'r':32,'rank_pattern':{}}))
+            tensors={
+                'linear.lora_A.weight':{'shape':[32,4096],'dtype':'F16'},
+                'linear.lora_B.weight':{'shape':[4096,32],'dtype':'F16'},
+                'conv.lora_A.weight':{'shape':[32,256,1,1],'dtype':'F16'},
+                'conv.lora_B.weight':{'shape':[256,32,1,1],'dtype':'F16'},
+            }
+            path=root/'adapter_model.safetensors'
+            header=json.dumps(tensors).encode()
+            path.write_bytes(struct.pack('<Q',len(header))+header)
+            result=adapter_shapes(path)
+            self.assertEqual(result['lora_pairs'],2)
+            self.assertEqual(result['tensor_ndims'],[2,4])
+            tensors['conv.lora_B.weight']['shape'][1]=16
+            header=json.dumps(tensors).encode()
+            path.write_bytes(struct.pack('<Q',len(header))+header)
+            with self.assertRaisesRegex(ValueError,'LoRA pair rank/shape mismatch'):
+                adapter_shapes(path)
+
     def test_download_selection_excludes_other_suites_and_requires_headers(self):
         root_files=(['config.json','dataset_statistics.json','model.safetensors.index.json',
                     'preprocessor_config.json','processor_config.json','tokenizer.json',

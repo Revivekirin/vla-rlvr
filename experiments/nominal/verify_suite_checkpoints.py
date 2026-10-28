@@ -34,12 +34,23 @@ def adapter_shapes(path):
         header=json.loads(f.read(length))
     tensors={k:v for k,v in header.items() if k!='__metadata__'}
     require(tensors,'Empty adapter')
-    a=[v['shape'] for k,v in tensors.items() if 'lora_A' in k]
-    b=[v['shape'] for k,v in tensors.items() if 'lora_B' in k]
-    require(a and b and len(a)==len(b),'Missing/mismatched LoRA matrices')
-    require(all(len(s)==2 and s[0]==32 for s in a),'LoRA A rank mismatch')
-    require(all(len(s)==2 and s[1]==32 for s in b),'LoRA B rank mismatch')
-    return {'tensor_count':len(tensors),'lora_pairs':len(a),'dtypes':sorted({v['dtype'] for v in tensors.values()})}
+    config=json.loads((path.parent/'adapter_config.json').read_text())
+    rank=config.get('r')
+    require(isinstance(rank,int) and rank>0,'Invalid configured LoRA rank')
+    require(not config.get('rank_pattern'),'Per-module LoRA ranks require explicit verification')
+    a={k:v['shape'] for k,v in tensors.items() if 'lora_A' in k}
+    b={k:v['shape'] for k,v in tensors.items() if 'lora_B' in k}
+    require(a and b and len(a)==len(b),'Missing/mismatched LoRA tensors')
+    for name,shape in a.items():
+        partner=name.replace('lora_A','lora_B',1)
+        require(partner in b,f'Missing LoRA B partner: {name}')
+        other=b[partner]
+        require(len(shape)>=2 and len(other)>=2 and len(shape)==len(other) and
+                shape[0]==rank and other[1]==rank and all(d>0 for d in shape+other),
+                f'LoRA pair rank/shape mismatch: {name}: A={shape}, B={other}, configured_rank={rank}')
+    return {'tensor_count':len(tensors),'lora_pairs':len(a),'configured_rank':rank,
+            'tensor_ndims':sorted({len(shape) for shape in a.values()}),
+            'dtypes':sorted({v['dtype'] for v in tensors.values()})}
 
 
 def main():
