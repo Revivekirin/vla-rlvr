@@ -227,11 +227,19 @@ def main():
     p.add_argument('--root', type=Path, default=ROOT)
     p.add_argument('--refresh', action='store_true')
     p.add_argument('--p3b-run')
+    p.add_argument('--suites', action='store_true',
+                   help='Also produce a separate Goal/Long/Spatial consolidated report')
     a=p.parse_args()
     data=build(a.root, a.p3b_run)
     paths=write_report(a.root,data,a.refresh)
     print(markdown(data))
     print('Saved:', *paths)
+    if a.suites:
+        if str(a.root) not in sys.path:
+            sys.path.insert(0,str(a.root))
+        from experiments.libero_plus import suite_report
+        consolidated=suite_report.build(a.root)
+        print('Saved consolidated:', *suite_report.write(a.root,consolidated,a.refresh))
 
 
 if __name__=='__main__':

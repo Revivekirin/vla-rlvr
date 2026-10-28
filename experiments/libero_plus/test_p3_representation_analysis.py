@@ -69,6 +69,9 @@ class BankTests(unittest.TestCase):
                b'            except RandomizationError:\n                pass\n')
         self.assertEqual(reference.count(before),1)
         self.assertTrue(b.recognized_reset_patch(reference,reference.replace(before,after)))
+        retry=after.replace(b'            except RandomizationError:\n                pass\n',
+                            b'            except RandomizationError:\n                continue\n')
+        self.assertTrue(b.recognized_reset_patch(reference,reference.replace(before,retry)))
         self.assertFalse(b.recognized_reset_patch(reference,reference.replace(before,after)+b' '))
         self.assertFalse(b.recognized_reset_patch(reference,reference))
 

@@ -37,7 +37,7 @@ def revision(path):
 
 
 def recognized_reset_patch(reference, actual):
-    """Accept only the known fix for LIBERO's reset loop, byte for byte."""
+    """Accept only the known reset fixes, including explicit retry, byte for byte."""
     before=(b'        success = False\n'
             b'        while not success:\n'
             b'            try:\n'
@@ -53,7 +53,12 @@ def recognized_reset_patch(reference, actual):
            b'                break\n'
            b'            except RandomizationError:\n'
            b'                pass\n')
-    return reference.count(before)==1 and actual==reference.replace(before,after)
+    retry=after.replace(b'            except RandomizationError:\n'
+                        b'                pass\n',
+                        b'            except RandomizationError:\n'
+                        b'                continue\n')
+    return reference.count(before)==1 and actual in (reference.replace(before,after),
+                                                      reference.replace(before,retry))
 
 
 def original_runtime_state(path):
