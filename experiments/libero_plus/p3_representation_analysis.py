@@ -36,6 +36,39 @@ def revision(path):
     return subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'], text=True).strip()
 
 
+def recognized_reset_patch(reference, actual):
+    """Accept only the known fix for LIBERO's reset loop, byte for byte."""
+    before=(b'        success = False\n'
+            b'        while not success:\n'
+            b'            try:\n'
+            b'                ret = self.env.reset()\n'
+            b'                success = True\n'
+            b'            except RandomizationError:\n'
+            b'                pass\n'
+            b'            finally:\n'
+            b'                continue\n')
+    after=(b'        while True:\n'
+           b'            try:\n'
+           b'                ret = self.env.reset()\n'
+           b'                break\n'
+           b'            except RandomizationError:\n'
+           b'                pass\n')
+    return reference.count(before)==1 and actual==reference.replace(before,after)
+
+
+def original_runtime_state(path):
+    relative='libero/libero/envs/env_wrapper.py'
+    changed=subprocess.check_output(['git','-C',str(path),'diff','--name-only','HEAD','--'],text=True).splitlines()
+    source=path/relative
+    if not changed:
+        return dict(state='clean',path=str(source),sha256=sha(source))
+    require(changed==[relative],f'LIBERO tracked changes outside the recognized reset fix: {changed}')
+    reference=subprocess.check_output(['git','-C',str(path),'show','HEAD:'+relative])
+    require(recognized_reset_patch(reference,source.read_bytes()),
+            'LIBERO env_wrapper.py differs from the recognized reset fix')
+    return dict(state='recognized_reset_fix',path=str(source),sha256=sha(source))
+
+
 def runpath(name):
     import re
     require(re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}',name), 'Invalid run ID')
@@ -138,7 +171,10 @@ def preflight(args):
         try:
             require(path.is_dir(),f'Missing checkout {path}')
             require(revision(path)==locks[name]['revision'],f'{name} revision mismatch')
-            require(not subprocess.check_output(['git','-C',str(path),'diff','HEAD','--'],text=True), f'{name} tracked source changed')
+            if name=='LIBERO':
+                result['original_runtime']=original_runtime_state(path)
+            else:
+                require(not subprocess.check_output(['git','-C',str(path),'diff','HEAD','--'],text=True), f'{name} tracked source changed')
             require((path/'libero/libero/assets').is_dir(),f'{name} assets absent')
         except Exception as e:
             errors.append(str(e))
@@ -561,6 +597,7 @@ def capture(args,run):
         files|=set(plan['historical_provenance'].get('files',{}))
         files|=set(sum(plan['task_files'].values(),[]))
         files|=set(plan['action_order']['evidence'])
+        files.add(plan['original_runtime']['path'])
         p=ROOT/'outputs/rlvr_analysis/p3/p3_a2_rollouts.csv'
         if p.exists(): files.add(str(p))
         m=dict(plan,nominal=str(args.original),plus=str(args.plus),mode=args.mode,seed=args.seed,

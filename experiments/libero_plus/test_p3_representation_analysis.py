@@ -57,6 +57,21 @@ class MetricsTests(unittest.TestCase):
 
 
 class BankTests(unittest.TestCase):
+    def test_only_known_original_libero_reset_fix_is_accepted(self):
+        source=b.ROOT/'vendor/LIBERO/libero/libero/envs/env_wrapper.py'
+        reference=source.read_bytes()
+        before=(b'        success = False\n        while not success:\n'
+                b'            try:\n                ret = self.env.reset()\n'
+                b'                success = True\n            except RandomizationError:\n'
+                b'                pass\n            finally:\n                continue\n')
+        after=(b'        while True:\n            try:\n'
+               b'                ret = self.env.reset()\n                break\n'
+               b'            except RandomizationError:\n                pass\n')
+        self.assertEqual(reference.count(before),1)
+        self.assertTrue(b.recognized_reset_patch(reference,reference.replace(before,after)))
+        self.assertFalse(b.recognized_reset_patch(reference,reference.replace(before,after)+b' '))
+        self.assertFalse(b.recognized_reset_patch(reference,reference))
+
     def test_stage_sampling_no_slot_pseudoreplication(self):
         idx,counts=b.sampling_indices(38,10)
         self.assertEqual(len(idx),10)
