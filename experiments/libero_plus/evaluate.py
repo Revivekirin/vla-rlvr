@@ -99,6 +99,8 @@ def run(args, entries):
         write_result(manifest_path, manifest)
     pending = []
     for entry in entries:
+        if args.task_ids is not None and entry['id'] not in args.task_ids:
+            continue
         path = out / f"task-{entry['id']:04d}.json"
         if path.exists():
             row = json.loads(path.read_text())
@@ -183,6 +185,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', choices=MODELS, default='sft')
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--task-ids', type=int, nargs='+', default=None)
     parser.add_argument('--plus', type=Path, default=ROOT / 'vendor/LIBERO-plus')
     parser.add_argument('--output', type=Path, default=ROOT / 'outputs/libero-plus')
     parser.add_argument('--execute', action='store_true')
@@ -196,6 +199,10 @@ def main():
         return
     configure(args.plus)
     entries = task_mapping(args.plus)
+    if args.task_ids is not None:
+        requested = set(args.task_ids)
+        assert len(requested) == len(args.task_ids), "Duplicate task IDs"
+        assert requested <= {e['id'] for e in entries}, "Unknown task IDs"
     print('shift counts:', dict(Counter(e['category'] for e in entries)))
     run(args, entries)
 
