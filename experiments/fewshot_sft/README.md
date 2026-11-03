@@ -29,11 +29,12 @@ python3 -m experiments.fewshot_sft.commands
 ```
 
 The generator only prints text. It includes actual implemented flags, single-GPU selection,
-Slurm `srun` guidance, and explicit `--execute` for every GPU stage. Set `RLDS_SOURCE` to the
-existing local `libero_goal_no_noops/<version>` directory and `DATASET_REVISION` to its
-verified Hugging Face commit first. Neither exists locally, so an executable source path
-cannot honestly be supplied here. Audit storage and local caches on the server before
-separately acquiring missing assets. The training launcher is offline and resolves only
+Slurm `srun` guidance, and explicit `--execute` for every GPU stage. `acquire` checks only
+exact known locations. Its `--execute` option fetches just the official 1.0.0 Goal dataset
+(16 TFRecord shards, about 1.84 GB) from pinned commit
+`a7c9ae18499b6eea8a32f78a9302327b752b1b5f`, after checking remote metadata and free
+storage. The command generator sets the resulting source path and revision explicitly.
+The training launcher is offline and resolves only
 `openvla/openvla-7b` from the HF cache; it cannot start from a released LIBERO checkpoint.
 
 ```bash
@@ -60,7 +61,10 @@ No larger-batch memory claim is made. Smoke and export memory are separate measu
   declared source revision, selection seed and per-task counts. No frame subsampling.
 - `--selection-manifest` validates and reuses the recorded selection; any changed source,
   selection, seed or shot count fails. Existing destination directories are never replaced.
-- Materialize only the selected episodes using the source FeaturesDict. This is necessary
+- Materialize only the selected episodes using the source FeaturesDict. Upstream
+  `dataset_info.json` names the builder `libero_goal` despite its official
+  `libero_goal_no_noops` directory. The tool checks both identities and preserves
+  original encoded JPEG bytes to avoid lossy re-encoding. This is necessary
   because the existing loader does not expose an episode-ID selector before normalization
   and flattening. All step/episode metadata and temporal ordering are retained. The source
   `_no_noops` filtering is not reapplied and discarded transitions are not reconstructed.

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 
 from .common import OFT, OUT, ROOT, read, sha, write
+from .acquire import candidates, ready
 
 
 def git(path):
@@ -29,7 +30,7 @@ def audit():
         'experiments/nominal/evaluate.py', 'experiments/server_env.sh',
         'experiments/libero_plus/research_report.py']
     sources = {p: {'exists':(ROOT/p).is_file(), 'sha256':sha(ROOT/p) if (ROOT/p).is_file() else None} for p in critical}
-    rlds = list((ROOT/'data').rglob('dataset_info.json'))
+    rlds = [p/'dataset_info.json' for p in candidates() if ready(p)]
     snapshots = list((__import__('pathlib').Path.home()/'.cache/huggingface/hub/models--openvla--openvla-7b/snapshots').glob('*'))
     return dict(host=platform.node(), platform=platform.platform(), python=platform.python_version(),
         root=str(ROOT), requested_server_path_exists=__import__('pathlib').Path('/nfs4/jhkim/repos/vla-rlvr').exists(),

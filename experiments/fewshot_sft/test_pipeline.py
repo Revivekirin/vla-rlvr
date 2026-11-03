@@ -4,6 +4,7 @@ import importlib.util
 import unittest
 import tempfile
 import json
+import io
 from pathlib import Path
 
 from .common import OFT, OUT, ROOT, destination, digest, tasks
@@ -135,6 +136,16 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(row['steps'],3)
         self.e['steps'][1]['action'][0] = 1
         self.assertNotEqual(row['sha256'],episode_record(self.e,'fixture')['sha256'])
+
+    def test_original_jpeg_bytes_are_hashable_without_reencoding(self):
+        from PIL import Image
+        import numpy as np
+        buffer = io.BytesIO()
+        Image.fromarray(np.zeros((8,8,3),dtype=np.uint8)).save(buffer,format='JPEG')
+        original = buffer.getvalue()
+        self.e['steps'][0]['observation']['image'] = original
+        self.assertEqual(episode_record(self.e,'fixture')['steps'],3)
+        self.assertEqual(self.e['steps'][0]['observation']['image'],original)
 
     def test_reject_wrong_action_shape(self):
         self.e['steps'][0]['action'] = self.e['steps'][0]['action'][:6]

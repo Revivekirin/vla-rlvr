@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter
 import hashlib
+import io
 from pathlib import Path
 import random
 import shutil
@@ -83,7 +84,13 @@ def episode_record(episode, episode_id):
         require(a.shape == (7,) and a.dtype == np.float32 and np.isfinite(a).all(), 'Invalid action')
         require(state.shape == (8,) and state.dtype == np.float32 and np.isfinite(state).all(), 'Invalid proprio')
         for key in ('image', 'wrist_image'):
-            im = np.asarray(s['observation'][key])
+            value = s['observation'][key]
+            if isinstance(value, bytes):
+                from PIL import Image
+                with Image.open(io.BytesIO(value)) as image:
+                    im = np.asarray(image.convert('RGB'))
+            else:
+                im = np.asarray(value)
             require(im.ndim == 3 and im.shape[-1] == 3 and im.dtype == np.uint8, 'Invalid RGB image')
     return dict(episode_id=episode_id, task=task, steps=len(steps), complete=True,
                 sha256=payload_hash(episode))
@@ -91,8 +98,11 @@ def episode_record(episode, episode_id):
 
 def episodes(builder):
     import tensorflow_datasets as tfds
+    # Preserve original JPEG bytes. Decoding and re-encoding would change pixels.
+    decoders = {'steps': {'observation': {
+        'image': tfds.decode.SkipDecoding(), 'wrist_image': tfds.decode.SkipDecoding()}}}
     ds = builder.as_dataset(split='train', shuffle_files=False,
-                           read_config=tfds.ReadConfig(add_tfds_id=True))
+                           read_config=tfds.ReadConfig(add_tfds_id=True), decoders=decoders)
     for e in tfds.as_numpy(ds):
         eid = e.pop('tfds_id').decode()
         e['steps'] = list(e['steps'])
@@ -111,7 +121,9 @@ def prepare(args):
                       content_sha256=digest(files), files=files)
     import tensorflow_datasets as tfds
     builder = tfds.builder_from_directory(str(source))
-    require(builder.info.name == NAME, 'TFDS builder name mismatch')
+    # Upstream 1.0.0 metadata says "libero_goal" although its directory is
+    # "libero_goal_no_noops"; the latter is the official training dataset key.
+    require(builder.info.name in ('libero_goal', NAME), 'Unexpected TFDS builder name')
     records = [episode_record(e, eid) for eid, e in episodes(builder)]
     require(len(records) == builder.info.splits['train'].num_examples, 'Source episode count mismatch')
     selected = select(records, args.shots, args.selection_seed, tasks())
@@ -152,6 +164,10 @@ def prepare(args):
             for eid, e in episodes(builder):
                 if eid in wanted:
                     require(episode_record(e, eid) == wanted[eid], 'Source episode changed during preparation')
+                    # Image accepts a file object containing already encoded JPEG.
+                    for step in e['steps']:
+                        for key in ('image', 'wrist_image'):
+                            step['observation'][key] = io.BytesIO(step['observation'][key])
                     yield eid, e
     subset = LiberoGoalNoNoops(data_dir=str(out/'rlds'))
     subset.download_and_prepare()

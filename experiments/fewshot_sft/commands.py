@@ -1,9 +1,14 @@
 """Print commands only. Never launches training or evaluation."""
 COMMANDS = r'''# Run from the repository root. On the server:
 # cd /nfs4/jhkim/repos/vla-rlvr
-# RLDS_SOURCE must be an audited LOCAL TFDS version directory containing dataset_info.json.
-# DATASET_REVISION must be the actual source HF dataset commit (no automatic download).
-# These two values cannot be inferred on this Mac because the source data are absent.
+# Local exact-path check is fast; optional fetch is pinned to the official Goal dataset only.
+python -m experiments.fewshot_sft.acquire
+# If absent and storage is sufficient, explicitly fetch just Goal (~1.84 GB):
+# python -m experiments.fewshot_sft.acquire --execute
+# The explicit Goal-only fetch writes this exact path; change it only if a different
+# verified local path was printed above. No recursive NFS search is needed.
+RLDS_SOURCE=data/modified_libero_rlds/libero_goal_no_noops/1.0.0
+DATASET_REVISION=a7c9ae18499b6eea8a32f78a9302327b752b1b5f
 
 # 1. Local audit, then read-only source dataset audit
 python -m experiments.fewshot_sft.audit --save
