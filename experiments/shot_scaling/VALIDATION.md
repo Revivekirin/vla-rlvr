@@ -1,5 +1,9 @@
 # Validation evidence — 2026-11-03
 
+Input-path regression: the CLI now rejects empty/unset environment-variable arguments,
+directories and nonexistent files with an option-specific parser error before dispatch.
+All 16 CPU tests passed, including these cases for every file-input option.
+
 Dependency compatibility correction: the original Matplotlib 3.9.4 pin conflicted with
 RIPT's required 3.9.0. Requirements now pin Matplotlib 3.9.0 and NumPy 1.26.4 to match
 `runtime/ript-vla/requirements.txt`. All 15 shot-scaling CPU tests, including PNG/SVG

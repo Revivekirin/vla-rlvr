@@ -117,6 +117,10 @@ declarative contracts only until those stages are implemented and validated.
 The following variables name real input artifacts conforming to the contracts below.
 No such real source inventory/trajectory artifacts or historical Goal5 selection manifest
 were found in this local checkout. These commands therefore require server evidence.
+The variables below are not set automatically. They must point to existing JSON files,
+not RLDS directories. The CLI rejects empty, missing and directory-valued inputs before
+loading configuration or creating outputs. A raw RLDS directory and a historical selection
+alone are insufficient: the inventory/trajectory extraction stage is still blocked.
 
 ```bash
 # 1. Historical Goal 5-shot analysis: validates the existing selection, never reselects it.

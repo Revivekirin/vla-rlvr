@@ -68,15 +68,24 @@ python -m experiments.shot_scaling plot --input "$SAVED_ANALYSIS"
 '''
 
 
+def input_file(value):
+    if not value.strip():
+        raise argparse.ArgumentTypeError('Empty file path: set the referenced environment variable to an existing JSON file')
+    path = Path(value).expanduser()
+    if not path.is_file():
+        raise argparse.ArgumentTypeError(f'Expected an existing file, not a directory or missing path: {path}')
+    return path
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('command', choices=['inspect', 'prepare', 'dataset-analyze', 'sft-train', 'sft-eval',
                                       'scale-train', 'ript-train', 'eval', 'aggregate', 'plot'])
-    p.add_argument('--inventory', type=Path)
-    p.add_argument('--trajectories', type=Path)
-    p.add_argument('--selection', type=Path)
-    p.add_argument('--input', type=Path)
-    p.add_argument('--resume', type=Path, help='Verify an existing selection file exactly; never overwrite')
+    p.add_argument('--inventory', type=input_file)
+    p.add_argument('--trajectories', type=input_file)
+    p.add_argument('--selection', type=input_file)
+    p.add_argument('--input', type=input_file)
+    p.add_argument('--resume', type=input_file, help='Verify an existing selection file exactly; never overwrite')
     p.add_argument('--historical', action='store_true', help='Reuse existing suite report, preserving released provenance')
     p.add_argument('--check', action='store_true', help='Readiness only; blocked stages exit 2')
     p.add_argument('--commands', action='store_true')

@@ -200,5 +200,19 @@ class PipelineTest(unittest.TestCase):
         for command in BLOCKERS:
             with redirect_stdout(io.StringIO()): self.assertEqual(main([command, '--check']), 2)
 
+    def test_input_paths_fail_before_dispatch(self):
+        from contextlib import redirect_stderr
+        import io
+        from experiments.shot_scaling.__main__ import main
+        with tempfile.TemporaryDirectory() as t:
+            for flag in ('--inventory', '--trajectories', '--selection', '--input', '--resume'):
+                for value in ('', '   ', t, str(Path(t)/'missing.json')):
+                    error = io.StringIO()
+                    with redirect_stderr(error), self.assertRaises(SystemExit) as raised:
+                        main(['dataset-analyze', flag, value])
+                    self.assertEqual(raised.exception.code, 2)
+                    self.assertIn(flag, error.getvalue())
+                    self.assertIn('Empty file path' if not value.strip() else 'Expected an existing file', error.getvalue())
+
 
 if __name__ == '__main__': unittest.main()
