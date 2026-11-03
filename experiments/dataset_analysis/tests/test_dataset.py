@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import numpy as np
 from experiments.shot_scaling.core import REVISION,SUITES,task_names,digest,write,sha
-from experiments.dataset_analysis.archive import create,verify,files
+from experiments.dataset_analysis.archive import create,verify,files,record_loss,verify_guards
 from experiments.dataset_analysis.audit import record,task_identity,no_leakage,convention
 from experiments.dataset_analysis.analysis import analyze,train_inventory,path_statistics
 
@@ -33,6 +33,23 @@ def fixture(suite='goal',physical=False):
 
 
 class DatasetTests(unittest.TestCase):
+    def test_loss_record_preserves_guards_and_does_not_claim_archive(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);src=root/'missing';guard=root/'checkpoint';guard.mkdir()
+            weights=guard/'weights';weights.write_bytes(b'original')
+            out=record_loss(src,root/'loss','User deleted previous results',[guard])
+            m=verify(out);verify_guards(m)
+            self.assertEqual(m['status'],'HISTORICAL_RESULTS_LOST')
+            self.assertFalse(m['originals_retained']);self.assertFalse((out/'artifacts').exists())
+            src.mkdir();verify_guards(m)
+            (src/'recovered.json').write_text('{}')
+            with self.assertRaises(ValueError):verify_guards(m)
+            with self.assertRaises(ValueError):record_loss(src,root/'other','deleted',[guard])
+            (src/'recovered.json').unlink()
+            weights.write_bytes(b'changed')
+            with self.assertRaises(ValueError):verify_guards(m)
+            out.chmod(0o755);(out/'archive_manifest.json').chmod(0o644)
+
     def test_task_identity_all_suites_and_long_scene_prefix(self):
         for suite in SUITES:
             for t in task_names(suite):

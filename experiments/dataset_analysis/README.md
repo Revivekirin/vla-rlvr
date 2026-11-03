@@ -28,6 +28,23 @@ python -m experiments.dataset_analysis archive \
 Every protected directory must exist; review actual locations before changing this
 list. No archive is made from an empty or missing source.
 
+If the previous analysis was already deleted, do not create an empty archive.
+Record the loss explicitly instead (only accepted for an absent/empty source):
+
+```bash
+python -m experiments.dataset_analysis record-loss \
+  --source outputs/shot_scaling \
+  --output outputs/archives/shot_scaling_loss_record \
+  --reason "User deleted previous shot_scaling results before rebuild" \
+  --protected outputs/fewshot_sft checkpoints
+```
+
+Then use `--archive outputs/archives/shot_scaling_loss_record` in the build command.
+The report and provenance record will state that the old results are lost, not
+archived. Surviving protected files must remain unchanged. The original RLDS and
+historical Goal5 selection manifest are still required; this option does not
+reconstruct lost selections or checkpoint provenance.
+
 Find actual original version directories; do not select a sampled dataset under outputs:
 
 ```bash
