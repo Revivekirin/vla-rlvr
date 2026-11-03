@@ -26,9 +26,10 @@ def candidates():
     hub = os.environ.get('HF_HUB_CACHE') or os.environ.get('HUGGINGFACE_HUB_CACHE')
     if hub is None:
         hub = str(Path(os.environ.get('HF_HOME', str(Path.home()/'.cache/huggingface')))/'hub')
-    snapshots = Path(hub)/'datasets--openvla--modified_libero_rlds/snapshots'
-    if snapshots.is_dir():
-        result.extend(p/NAME/VERSION for p in snapshots.iterdir() if p.is_dir())
+    for cache in (Path(hub), ROOT/'data/hf-cache', ROOT/'data/hf-cache/hub'):
+        snapshots = cache/'datasets--openvla--modified_libero_rlds/snapshots'
+        if snapshots.is_dir():
+            result.extend(p/NAME/VERSION for p in snapshots.iterdir() if p.is_dir())
     return list(dict.fromkeys(p.resolve() for p in result))
 
 

@@ -2,9 +2,11 @@
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
 import shutil
 import subprocess
+from pathlib import Path
 
 from .common import OFT, OUT, ROOT, read, sha, write
 from .acquire import candidates, ready
@@ -31,7 +33,12 @@ def audit():
         'experiments/libero_plus/research_report.py']
     sources = {p: {'exists':(ROOT/p).is_file(), 'sha256':sha(ROOT/p) if (ROOT/p).is_file() else None} for p in critical}
     rlds = [p/'dataset_info.json' for p in candidates() if ready(p)]
-    snapshots = list((__import__('pathlib').Path.home()/'.cache/huggingface/hub/models--openvla--openvla-7b/snapshots').glob('*'))
+    env_cache = os.environ.get('HF_HUB_CACHE') or os.environ.get('HUGGINGFACE_HUB_CACHE')
+    env_home = os.environ.get('HF_HOME')
+    model_cache_roots = tuple(Path(p) for p in (env_cache, str(Path(env_home)/'hub') if env_home else None) if p) + (Path.home()/'.cache/huggingface/hub',
+                         ROOT/'data/hf-cache', ROOT/'data/hf-cache/hub')
+    snapshots = [p for cache in model_cache_roots
+                 for p in (cache/'models--openvla--openvla-7b/snapshots').glob('*') if p.is_dir()]
     return dict(host=platform.node(), platform=platform.platform(), python=platform.python_version(),
         root=str(ROOT), requested_server_path_exists=__import__('pathlib').Path('/nfs4/jhkim/repos/vla-rlvr').exists(),
         workspace_sha=git(ROOT), declared_revisions=read(ROOT/'stage0/repos.lock.json'),
@@ -48,8 +55,8 @@ def audit():
         ript_comparison='RIPT README explicitly uses released official OFT SFT checkpoints; shared action/proprio loaders. RIPT patches LlamaSdpaAttention for cached bidirectional action forwarding; standalone policy additionally requires scale head. No scale/RL modules are initialized here.',
         latest_upstream='Official main finetune.py inspected via GitHub; no live commit SHA established. Local lock is not claimed as verified checkout SHA.',
         blockers=[reason for condition, reason in [
-            (not rlds, 'No local RLDS dataset under data/'),
-            (not snapshots, 'No cached openvla/openvla-7b snapshot in default HF cache'),
+            (not rlds, 'No complete local Goal RLDS dataset in the exact data/cache paths'),
+            (not snapshots, 'No cached openvla/openvla-7b snapshot in the checked HF caches'),
             (not packages['torch'], 'PyTorch unavailable; CUDA smoke and memory measurement not run'),
             (not packages['tensorflow'], 'TensorFlow unavailable; real RLDS validation not run'),
             (not packages['tensorflow-datasets'], 'TFDS unavailable; subset materialization not run')]
