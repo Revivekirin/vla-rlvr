@@ -1,0 +1,4 @@
+name: long
+benchmark: libero_10
+dataset: libero_10_no_noops
+horizon: 520

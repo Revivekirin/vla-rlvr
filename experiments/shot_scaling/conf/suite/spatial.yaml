@@ -1,0 +1,4 @@
+name: spatial
+benchmark: libero_spatial
+dataset: libero_spatial_no_noops
+horizon: 220

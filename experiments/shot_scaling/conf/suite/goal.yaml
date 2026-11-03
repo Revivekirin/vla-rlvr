@@ -1,0 +1,4 @@
+name: goal
+benchmark: libero_goal
+dataset: libero_goal_no_noops
+horizon: 300

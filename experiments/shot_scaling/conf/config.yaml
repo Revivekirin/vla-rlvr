@@ -1,0 +1,44 @@
+defaults:
+  - suite: goal
+  - _self_
+shots: 5
+selection_seed: 42
+train_seed: 7
+eval_seed: 1
+dataset:
+  repo: openvla/modified_libero_rlds
+  revision: a7c9ae18499b6eea8a32f78a9302327b752b1b5f
+  split: train
+sft:
+  base: openvla/openvla-7b
+  loss: l1
+  cameras: 2
+  proprio: true
+  chunk: 8
+  action_dim: 7
+  lora_rank: 32
+  batch_size: 1
+  accumulation: 1
+  learning_rate: 0.0005
+  max_steps: 1
+  save_freq: 1
+scale:
+  loss: laplace_nll
+  sft_checkpoint: null
+  max_steps: 1
+ript:
+  optimizer: official_ppo
+  learning_rate: 0.00001
+  scale_checkpoint: null
+  d0_checkpoint: null
+  max_updates: 1
+evaluation:
+  dataset: nominal
+  inference: sft_full
+  checkpoint: null
+  max_tasks: 1
+  max_trials: 1
+execution:
+  gpu: 0
+  world_size: 1
+output: outputs/shot_scaling
