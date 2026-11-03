@@ -40,6 +40,25 @@ def check(path, merged=True):
     return m
 
 
+def check_export(path):
+    """Accept only a verified merged model or a verified unmerged adapter export."""
+    path = Path(path)
+    m = read(path/'fewshot_checkpoint.json')
+    if m.get('export_format') != 'adapter':
+        return check(path)
+    check(path, merged=False)
+    require((path/'lora_adapter/adapter_model.safetensors').is_file() and
+            (path/'lora_adapter/adapter_config.json').is_file(), 'Incomplete SFT adapter export')
+    proof = read(path/'adapter_verification.json')
+    require(proof['passed'] and proof['max_reload_error'] <= proof['atol'] <= .02,
+            'Adapter reload numerical test did not pass')
+    expected = read(path/'export_files.json')
+    actual = inventory(path)
+    actual.pop('export_files.json', None)
+    require(actual == expected, 'Adapter export files changed after verification')
+    return m
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--checkpoint', type=Path, required=True)
@@ -47,6 +66,8 @@ def main():
     p.add_argument('--audit-only', action='store_true')
     p.add_argument('--diagnose-merge', action='store_true',
                    help='Compare repeated adapter and merged actions without writing an export')
+    p.add_argument('--export-unmerged', action='store_true',
+                   help='Export a verified adapter-backed policy when BF16 merging changes actions')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--atol', type=float, default=0.02, help='Absolute action tolerance for BF16 merge, rtol=0')
     a = p.parse_args()
@@ -54,6 +75,7 @@ def main():
         print(__import__('json').dumps(check(a.checkpoint), indent=2))
         return
     m = check(a.checkpoint, merged=False)
+    require(not (a.diagnose_merge and a.export_unmerged), 'Choose diagnose or unmerged export')
     require(0 < a.atol <= .02, 'Merge tolerance must be positive and at most 0.02')
     if a.diagnose_merge:
         require(a.output is None, '--diagnose-merge does not take an output destination')
@@ -105,6 +127,43 @@ def main():
     if not a.diagnose_merge:
         require(repeat_passed,
                 f'Repeated unmerged inference differs: max_abs_error={repeat_error:.6g}')
+    if a.export_unmerged:
+        out.mkdir(parents=True)
+        for f in a.checkpoint.iterdir():
+            if f.is_file() and f.name != 'optimizer.pt':
+                shutil.copy2(f, out/f.name)
+        shutil.copytree(a.checkpoint/'lora_adapter', out/'lora_adapter')
+        processor.save_pretrained(out)
+        del model, base
+        gc.collect(); torch.cuda.empty_cache()
+        reload_base = OpenVLAForActionPrediction.from_pretrained(m['base_snapshot'], torch_dtype=torch.bfloat16,
+                                                                  low_cpu_mem_usage=True).cuda()
+        reload_base.vision_backbone.set_num_images_in_input(2)
+        reload_base.norm_stats = read(out/'dataset_statistics.json')
+        reloaded = PeftModel.from_pretrained(reload_base, out/'lora_adapter').eval()
+        cfg.pretrained_checkpoint = str(out)
+        head = utils.get_action_head(cfg, reload_base.llm_dim)
+        proprio = utils.get_proprio_projector(cfg, reload_base.llm_dim, proprio_dim=8)
+        processor = AutoProcessor.from_pretrained(m['base_snapshot'], trust_remote_code=True)
+        reloaded_actions = predict(reloaded)
+        reload_error = float(np.max(np.abs(before-reloaded_actions)))
+        require(np.allclose(before, reloaded_actions, atol=a.atol, rtol=0),
+                f'Unmerged adapter reload discrepancy: max_abs_error={reload_error:.6g}')
+        write(out/'fewshot_checkpoint.json', dict(m, merged=False, export_format='adapter',
+            source_checkpoint=str(a.checkpoint.resolve())), replace=True)
+        write(out/'adapter_verification.json', dict(passed=True, atol=a.atol, rtol=0, input_seed=42,
+            before=before.tolist(), reloaded=reloaded_actions.tolist(), repeat_error=repeat_error,
+            max_reload_error=reload_error, elapsed_seconds=time.monotonic()-started,
+            peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+        write(out/'compatibility.json', dict(status='Unmerged OFT SFT adapter reload verified; RIPT cached inference untested',
+            architecture='OpenVLAForActionPrediction', action_head=[8,7], proprio_dim=8,
+            normalization_key=NAME, merged=False, adapter=str(out/'lora_adapter'),
+            interface_sha256=sha(ROOT/'runtime/ript-vla/ript/algos/rl_optimizers/openvla_oft_interface.py'),
+            cached_attention='Static patch exists; not executed',
+            full_ript_policy='Requires separate pretrained scale header; intentionally not instantiated'))
+        write(out/'export_files.json', inventory(out))
+        check_export(out)
+        return
     merged = model.merge_and_unload(safe_merge=True).eval()
     after = predict(merged)
     merge_error = float(np.max(np.abs(before-after)))

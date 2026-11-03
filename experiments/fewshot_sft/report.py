@@ -8,7 +8,7 @@ from .common import OUT, read, write
 
 def report():
     result = dict(audit=read(OUT/'audit.json') if (OUT/'audit.json').exists() else None,
-                  datasets=[], training=[], checkpoints=[], evaluations=[],
+                  datasets=[], training=[], checkpoints=[], incomplete_exports=[], evaluations=[],
                   cpu_tests=read(OUT/'cpu_tests.json') if (OUT/'cpu_tests.json').exists() else None,
                   gpu_resource_estimate=None, validation_loss=None)
     for path in sorted((OUT/'datasets').glob('*/dataset_audit.json')):
@@ -24,8 +24,13 @@ def report():
                 peak_allocated_bytes=run['runtime']['peak_allocated_bytes'],
                 peak_reserved_bytes=run['runtime']['peak_reserved_bytes'])
     for path in sorted((OUT/'exports').glob('*/fewshot_checkpoint.json')):
-        result['checkpoints'].append(dict(metadata=read(path), compatibility=read(path.parent/'compatibility.json')
-            if (path.parent/'compatibility.json').exists() else 'unverified'))
+        compatibility = path.parent/'compatibility.json'
+        proof = path.parent/('adapter_verification.json' if read(path).get('export_format') == 'adapter'
+                             else 'merge_verification.json')
+        record = dict(metadata=read(path), compatibility=read(compatibility) if compatibility.exists() else None)
+        (result['checkpoints'] if compatibility.exists() and proof.exists() and
+         (path.parent/'export_files.json').exists() and
+         read(proof).get('passed') else result['incomplete_exports']).append(record)
     for path in sorted((OUT/'eval').rglob('selection.json')):
         rows = [read(p) for p in sorted(path.parent.rglob('task-*.json'))]
         groups = defaultdict(list)

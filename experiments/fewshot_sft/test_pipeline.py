@@ -7,11 +7,11 @@ import json
 import io
 from pathlib import Path
 
-from .common import OFT, OUT, ROOT, destination, digest, tasks
+from .common import OFT, OUT, ROOT, destination, digest, inventory, tasks
 from .prepare_dataset import episode_record, select, validate_manifest
 from .train import parser, plan
 from .worker import instrument
-from .checkpoint import check
+from .checkpoint import check, check_export
 
 
 class SelectionTests(unittest.TestCase):
@@ -66,6 +66,31 @@ class SelectionTests(unittest.TestCase):
 
 
 class LauncherTests(unittest.TestCase):
+    def test_adapter_export_requires_reload_proof_and_unchanged_files(self):
+        c = plan(parser().parse_args(['--run-id','fixture','--max-steps','1','--save-freq','1']))
+        c.update(step=1, selected_transitions=100, export_format='adapter', merged=False)
+        stats = {'num_trajectories':50,'num_transitions':100}
+        for kind, dim in [('action',7),('proprio',8)]:
+            stats[kind] = {field:[0.]*dim for field in ('mean','std','min','max','q01','q99')}
+        stats['action']['mask'] = [True]*6+[False]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            (path/'fewshot_checkpoint.json').write_text(json.dumps(c))
+            (path/'dataset_statistics.json').write_text(json.dumps({'libero_goal_no_noops':stats}))
+            for name in ('action_head','proprio_projector'):
+                (path/f'{name}--1_checkpoint.pt').touch()
+            adapter = path/'lora_adapter'
+            adapter.mkdir()
+            (adapter/'adapter_config.json').write_text('{}')
+            (adapter/'adapter_model.safetensors').write_bytes(b'fixture')
+            with self.assertRaises(FileNotFoundError): check_export(path)
+            (path/'adapter_verification.json').write_text(json.dumps(
+                {'passed':True,'atol':.02,'max_reload_error':0.}))
+            (path/'export_files.json').write_text(json.dumps(inventory(path)))
+            check_export(path)
+            (adapter/'adapter_model.safetensors').write_bytes(b'changed')
+            with self.assertRaises(ValueError): check_export(path)
+
     def test_normalization_metadata(self):
         c = plan(parser().parse_args(['--run-id','fixture','--max-steps','1','--save-freq','1']))
         c.update(step=1, selected_transitions=100)

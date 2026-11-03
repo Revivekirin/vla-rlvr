@@ -11,7 +11,7 @@ Real TFDS materialization, training, merging, GPU inference and rollouts remain 
 No training, dataset download or evaluation has been launched. Do not interpret the code's
 presence as a successful experiment.
 
-All 24 CPU tests passed using the app's bundled Python (which includes NumPy):
+All 25 CPU tests passed using the app's bundled Python (which includes NumPy):
 
 ```bash
 /Users/jihyekim/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m experiments.fewshot_sft.cpu_tests
@@ -106,6 +106,12 @@ If merge comparison fails, `checkpoint --checkpoint PATH --diagnose-merge --exec
 repeatability, maximum and per-dimension action differences without writing an export.
 The export destination is created only after the in-memory comparison passes; a failed
 older export directory remains invalid and must not be evaluated.
+When BF16 merge exceeds the fixed tolerance, `checkpoint --checkpoint PATH --output NEW_PATH
+--export-unmerged --execute` exports the original SFT adapter with its base identity,
+action/proprio heads and normalization. It reloads that adapter and verifies fixed-input
+actions before allowing nominal evaluation. This path records `merged=false`; it does not
+claim equivalence of the rejected BF16 merge. The evaluator loads base plus adapter only
+inside its own process and keeps the original rollout loop.
 This numerical smoke does not establish equivalence on all observations. Exports without
 passing evidence or with changed file hashes cannot be evaluated.
 

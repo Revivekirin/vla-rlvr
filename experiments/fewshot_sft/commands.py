@@ -29,6 +29,9 @@ python -m experiments.fewshot_sft.cpu_tests
 bash experiments/server_env.sh original python -m experiments.fewshot_sft.train --suite goal --shots 5 --selection-seed 42 --train-seed 7 --batch-size 1 --learning-rate 5e-4 --max-steps 1 --save-freq 1 --run-id goal5-smoke --smoke --execute
 bash experiments/server_env.sh original python -m experiments.fewshot_sft.checkpoint --checkpoint outputs/fewshot_sft/runs/goal5-smoke--1_chkpt --output outputs/fewshot_sft/exports/goal5-smoke-step1 --execute
 bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-smoke-step1 --phase smoke --selection-note 'One-step pipeline validation; not checkpoint selection' --execute
+# If BF16 merging fails its numerical check, use an unmerged adapter export at a NEW path:
+# bash experiments/server_env.sh original python -m experiments.fewshot_sft.checkpoint --checkpoint outputs/fewshot_sft/runs/goal5-smoke--1_chkpt --output outputs/fewshot_sft/exports/goal5-smoke-step1-adapter --export-unmerged --execute
+# bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-smoke-step1-adapter --phase smoke --selection-note 'One-step adapter-backed pipeline validation; BF16 merge rejected' --execute
 
 # 5. Bounded SFT: 200 actual optimizer steps, checkpoints at 50/100/150/200
 bash experiments/server_env.sh original python -m experiments.fewshot_sft.train --suite goal --shots 5 --selection-seed 42 --train-seed 7 --batch-size 1 --learning-rate 5e-4 --max-steps 200 --save-freq 50 --run-id goal5-pilot --smoke-evidence outputs/fewshot_sft/runs/goal5-smoke/runtime.json --execute
