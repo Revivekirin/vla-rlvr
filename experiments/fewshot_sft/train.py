@@ -27,6 +27,11 @@ def parser():
     p.add_argument('--resume', type=Path, help='Our unmerged checkpoint; optimizer resumes, TF shuffle restarts')
     p.add_argument('--smoke', action='store_true')
     p.add_argument('--smoke-evidence', type=Path, help='Measured successful one-step training run runtime.json')
+    p.add_argument('--checkpoint-steps', nargs='+', type=int, default=[1000, 3000, 6000])
+    p.add_argument('--validation', type=Path, help='Disjoint held-out expert dataset prepared by validation.py')
+    p.add_argument('--validation-freq', type=int, default=1000)
+    p.add_argument('--loss-window', type=int, default=100)
+    p.add_argument('--verify-resume', action='store_true', help='Load and verify all resume state, then exit without updates')
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--execute', action='store_true')
     return p
@@ -34,6 +39,10 @@ def parser():
 
 def plan(a):
     require(a.max_steps > 0 and 0 < a.save_freq <= a.max_steps, 'Invalid explicit step/save bounds')
+    require(a.max_steps <= 6000, 'This bounded SFT stage stops at 6000; 12000 is not enabled')
+    require(all(0 < s <= 6000 for s in a.checkpoint_steps), 'Checkpoint steps must be within 1..6000')
+    require(a.validation_freq > 0 and a.loss_window > 0, 'Invalid diagnostics frequency/window')
+    require(not a.verify_resume or a.resume is not None, '--verify-resume requires --resume')
     require(a.batch_size > 0 and a.gradient_accumulation > 0 and a.learning_rate > 0, 'Invalid optimizer configuration')
     require(a.run_id and all(c.isalnum() or c in '-_' for c in a.run_id), 'Unsafe run ID')
     require(not a.smoke or (a.max_steps == a.save_freq == a.batch_size == a.gradient_accumulation == 1),
@@ -47,10 +56,15 @@ def plan(a):
                 learning_rate=a.learning_rate, max_steps=a.max_steps, save_freq=a.save_freq,
                 resume=str(a.resume.resolve()) if a.resume else None,
                 resume_semantics='optimizer/scheduler/weights restored; deterministic TF data stream restarts',
+                checkpoint_steps=sorted(set(s for s in a.checkpoint_steps if s <= a.max_steps)),
+                validation=str(a.validation.resolve()) if a.validation else None,
+                validation_freq=a.validation_freq, loss_window=a.loss_window, verify_resume=a.verify_resume,
+                scheduler_config=dict(kind='MultiStepLR', milestones=[100000], gamma=0.1, warmup_steps=0),
                 smoke=a.smoke, architecture=dict(use_l1_regression=True, use_diffusion=False, use_film=False,
                     num_images_in_input=2, use_proprio=True, use_lora=True, lora_rank=32,
                     action_chunk=8, action_dim=7, proprio_dim=8, image_aug=True),
-                merged=False, held_out_validation='not configured; no training episodes reused as validation')
+                merged=False, held_out_validation='disjoint complete experts; train normalization; finite full traversal'
+                if a.validation else 'not configured; no training episodes reused as validation')
 
 
 def main():
@@ -69,6 +83,12 @@ def main():
     require(audit['status'] == 'verified_materialization', 'Subset has not passed integrity validation')
     require(inventory(dataset/'rlds') == audit['subset_files'], 'Materialized RLDS content changed')
     require(digest(read(dataset/'normalization.json')) == audit['normalization_sha256'], 'Normalization changed')
+    require(a.max_steps <= 200 or a.verify_resume or a.validation is not None,
+            'Extended SFT requires disjoint held-out expert validation')
+    if a.validation:
+        from .validation import check_validation
+        check_validation(a.validation, dataset)
+        c['validation_manifest_sha256'] = sha(a.validation/'validation_manifest.json')
     c.update(selection_manifest_sha256=sha(dataset/'selection_manifest.json'),
              selected_transitions=audit['selected_transitions'],
              expected_frame_draws=a.max_steps*c['effective_batch_size'],
@@ -77,10 +97,11 @@ def main():
     c['source_hashes'] = {str(p.relative_to(ROOT)): sha(p) for p in [
         OFT/'prismatic/vla/datasets/datasets.py', OFT/'prismatic/vla/datasets/rlds/dataset.py',
         OFT/'prismatic/vla/datasets/rlds/oxe/transforms.py', OFT/'prismatic/vla/constants.py',
-        OFT/'prismatic/extern/hf/modeling_prismatic.py', ROOT/'experiments/fewshot_sft/worker.py']}
+        OFT/'prismatic/extern/hf/modeling_prismatic.py',
+        *[ROOT/'experiments/fewshot_sft'/name for name in ('worker.py','diagnostics.py','resume_checks.py','validation.py')]]}
     import torch
     require(torch.cuda.is_available() and torch.cuda.is_bf16_supported(), 'CUDA BF16 GPU required')
-    if not a.smoke:
+    if not a.smoke and not a.verify_resume:
         require(a.smoke_evidence is not None, 'Run the one-step GPU smoke before bounded training')
         smoke = read(a.smoke_evidence)
         require(smoke['status'] == 'passed' and smoke['actual_optimizer_steps'] == 1,
@@ -98,9 +119,20 @@ def main():
     c['base_revision'] = base.name
     c['base_files'] = inventory(base)
     if a.resume:
+        from .checkpoint import check
+        from .resume_checks import verify_normalization
+        check(a.resume, merged=False)
+        verify_normalization(a.resume, dataset)
         old = read(a.resume/'fewshot_checkpoint.json')
         require(old['base_revision'] == c['base_revision'] and
                 old['selection_manifest_sha256'] == c['selection_manifest_sha256'], 'Resume provenance mismatch')
+        require(old['base_files'] == c['base_files'], 'Pretrained base bytes changed since checkpoint')
+        require(old['architecture'] == c['architecture'], 'Resume architecture changed')
+        for source, old_hash in old.get('source_hashes', {}).items():
+            if source.startswith('runtime/openvla-oft/'):
+                require(c['source_hashes'].get(source) == old_hash, f'Upstream OFT source changed: {source}')
+        if old.get('validation_manifest_sha256'):
+            require(c.get('validation_manifest_sha256') == old['validation_manifest_sha256'], 'Validation selection changed on resume')
         require(not old['merged'] and old['step'] < a.max_steps, 'Resume requires unmerged, earlier checkpoint')
         c['resume_step'] = old['step']
         require((a.resume/'optimizer.pt').is_file(), 'Missing resumable optimizer state')
@@ -108,6 +140,14 @@ def main():
             require(old[key] == c[key], f'Resume configuration changed: {key}')
         c['expected_frame_draws'] = (a.max_steps-old['step'])*c['effective_batch_size']
         c['expected_dataset_repetitions'] = c['expected_frame_draws']/audit['selected_transitions']
+        c['resume_files'] = inventory(a.resume)
+        c['resume_source_hashes'] = old.get('source_hashes', {})
+        c['continuity'] = dict(start_step=old['step'], tf_iterator_restored=False,
+            rng_restored=False, bitwise_uninterrupted_equivalence=False,
+            note='TF shuffle/prefetch and RNG restart from train seed. Legacy exposure before step 200 is unknown.')
+        if a.verify_resume:
+            c['expected_frame_draws'] = 0
+            c['expected_dataset_repetitions'] = 0
     run = Path(c['output'])
     require(not run.exists(), 'Run ID already exists; choose a new ID even when resuming')
     require(not list(run.parent.glob(run.name+'--*')), 'Checkpoint run prefix already exists')

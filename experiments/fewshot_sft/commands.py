@@ -1,5 +1,6 @@
 """Print commands only. Never launches training or evaluation."""
 COMMANDS = r'''# Run from the repository root. On the server:
+# For the existing completed step-200 pilot, use CONTINUATION.md instead of rerunning preparation/smoke.
 # cd /nfs4/jhkim/repos/vla-rlvr
 # Local exact-path check is fast; optional fetch is pinned to the official Goal dataset only.
 python -m experiments.fewshot_sft.acquire
@@ -36,15 +37,16 @@ bash experiments/server_env.sh original python -m experiments.fewshot_sft.evalua
 # 5. Bounded SFT: 200 actual optimizer steps, checkpoints at 50/100/150/200
 bash experiments/server_env.sh original python -m experiments.fewshot_sft.train --suite goal --shots 5 --selection-seed 42 --train-seed 7 --batch-size 1 --learning-rate 5e-4 --max-steps 200 --save-freq 50 --run-id goal5-pilot --smoke-evidence outputs/fewshot_sft/runs/goal5-smoke/runtime.json --execute
 
-# 6. Export a predeclared checkpoint; LoRA merge plus fixed-input numerical verification
-bash experiments/server_env.sh original python -m experiments.fewshot_sft.checkpoint --checkpoint outputs/fewshot_sft/runs/goal5-pilot--200_chkpt --output outputs/fewshot_sft/exports/goal5-pilot-step200 --execute
+# 6. Export a predeclared checkpoint with verified unmerged adapter reload
+bash experiments/server_env.sh original python -m experiments.fewshot_sft.checkpoint --checkpoint outputs/fewshot_sft/runs/goal5-pilot--200_chkpt --output outputs/fewshot_sft/exports/goal5-pilot-step200-adapter --export-unmerged --execute
 
-# 7. Pilot: 10 tasks x 20 trials
-bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-pilot-step200 --phase pilot --selection-note 'Predeclared step 200; no prior nominal checkpoint tuning' --execute
+# 7. Small diagnostic: 10 tasks x 2 trials, plus released Full-SFT control (10 x 1)
+bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-pilot-step200-adapter --phase diagnostic --selection-note 'Predeclared step 200 diagnostic; nominal model selection' --execute
+bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint checkpoints/goal/oft --full-sft --phase diagnostic --trials-per-task 1 --run-label control --selection-note 'Full-SFT same-evaluator control' --execute
 
-# 8. Final: 10 tasks x 50 trials, explicit opt-in only
-# Amend this note if checkpoint choice used pilot results; all notes remain in the report.
-bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-pilot-step200 --phase final --selection-note 'Step 200 selected before pilot; pilot reviewed, no checkpoint retuning' --execute
+# 8. Expand only with positive, complete small-evaluation evidence for this exact model.
+# Zero-success diagnostics are blocked. See CONTINUATION.md for the 1000/3000/6000 schedule.
+bash experiments/server_env.sh original python -m experiments.fewshot_sft.evaluate --checkpoint outputs/fewshot_sft/exports/goal5-pilot-step200-adapter --phase pilot --gate-evidence outputs/fewshot_sft/eval/goal_5shot_seed42/goal5-pilot-step200-adapter/diagnostic/summary.json --full-sft-evidence outputs/fewshot_sft/eval/full_sft_goal/oft/diagnostic-control/summary.json --selection-note 'Expansion after nominal diagnostic and Full-SFT control; nominal used in selection' --execute
 
 # 9. Read-only aggregation, or refresh the two derived summaries
 python -m experiments.fewshot_sft.report

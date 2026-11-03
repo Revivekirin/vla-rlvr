@@ -15,6 +15,13 @@ from .common import BASE, NAME, OFT, ROOT, destination, inventory, read, require
 def check(path, merged=True):
     path = Path(path)
     m = read(path/'fewshot_checkpoint.json')
+    if not merged and m.get('export_format') != 'adapter' and 'cumulative_optimizer_steps' in m:
+        require((path/'checkpoint_files.json').is_file(), 'Incomplete new checkpoint: file verification not committed')
+        require(read(path/'component_verification.json')['status'] == 'passed', 'Checkpoint components not verified')
+    if not merged and m.get('export_format') != 'adapter' and (path/'checkpoint_files.json').is_file():
+        actual = inventory(path)
+        actual.pop('checkpoint_files.json')
+        require(actual == read(path/'checkpoint_files.json'), 'Training checkpoint files changed')
     require(m['base_identity'] == BASE and m['merged'] == merged, 'Wrong base identity or merge state')
     require(m['architecture'] == dict(use_l1_regression=True, use_diffusion=False, use_film=False,
         num_images_in_input=2, use_proprio=True, use_lora=True, lora_rank=32,
@@ -72,7 +79,9 @@ def main():
     p.add_argument('--atol', type=float, default=0.02, help='Absolute action tolerance for BF16 merge, rtol=0')
     a = p.parse_args()
     if a.audit_only:
-        print(__import__('json').dumps(check(a.checkpoint), indent=2))
+        metadata = read(a.checkpoint/'fewshot_checkpoint.json')
+        checked = check_export(a.checkpoint) if metadata.get('export_format') == 'adapter' else check(a.checkpoint, merged=metadata['merged'])
+        print(__import__('json').dumps(checked, indent=2))
         return
     m = check(a.checkpoint, merged=False)
     require(not (a.diagnose_merge and a.export_unmerged), 'Choose diagnose or unmerged export')
@@ -121,6 +130,9 @@ def main():
         require(actions.shape == (8, 7) and np.isfinite(actions).all(), 'Invalid action chunk')
         return actions
     before = predict(model)
+    from .resume_checks import verify_components
+    components_before = verify_components(a.checkpoint, model, head, proprio, inference=True)
+    require(base.norm_stats == read(a.checkpoint/'dataset_statistics.json'), 'Loaded normalization differs')
     before_repeat = predict(model)
     repeat_error = float(np.max(np.abs(before-before_repeat)))
     repeat_passed = bool(np.allclose(before, before_repeat, atol=a.atol, rtol=0))
@@ -130,7 +142,7 @@ def main():
     if a.export_unmerged:
         out.mkdir(parents=True)
         for f in a.checkpoint.iterdir():
-            if f.is_file() and f.name != 'optimizer.pt':
+            if f.is_file() and f.name not in ('optimizer.pt', 'checkpoint_files.json'):
                 shutil.copy2(f, out/f.name)
         shutil.copytree(a.checkpoint/'lora_adapter', out/'lora_adapter')
         processor.save_pretrained(out)
@@ -146,12 +158,17 @@ def main():
         proprio = utils.get_proprio_projector(cfg, reload_base.llm_dim, proprio_dim=8)
         processor = AutoProcessor.from_pretrained(m['base_snapshot'], trust_remote_code=True)
         reloaded_actions = predict(reloaded)
+        components_after = verify_components(out, reloaded, head, proprio, inference=True)
+        require(components_before == components_after, 'Export component identities changed')
+        require(reload_base.norm_stats == read(out/'dataset_statistics.json'), 'Reloaded normalization differs')
         reload_error = float(np.max(np.abs(before-reloaded_actions)))
-        require(np.allclose(before, reloaded_actions, atol=a.atol, rtol=0),
+        adapter_atol = min(a.atol, 1e-6)
+        require(np.allclose(before, reloaded_actions, atol=adapter_atol, rtol=0),
                 f'Unmerged adapter reload discrepancy: max_abs_error={reload_error:.6g}')
         write(out/'fewshot_checkpoint.json', dict(m, merged=False, export_format='adapter',
             source_checkpoint=str(a.checkpoint.resolve())), replace=True)
-        write(out/'adapter_verification.json', dict(passed=True, atol=a.atol, rtol=0, input_seed=42,
+        write(out/'adapter_verification.json', dict(passed=True, atol=adapter_atol, rtol=0, input_seed=42,
+            components_before=components_before, components_after=components_after,
             before=before.tolist(), reloaded=reloaded_actions.tolist(), repeat_error=repeat_error,
             max_reload_error=reload_error, elapsed_seconds=time.monotonic()-started,
             peak_reserved_bytes=torch.cuda.max_memory_reserved()))

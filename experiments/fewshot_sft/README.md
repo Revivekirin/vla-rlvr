@@ -5,13 +5,18 @@ exports its learned LoRA/action/proprio components, and reuses the original nomi
 loop. It never trains a scale head or RL policy. Existing runtime sources, checkpoints and
 Goal/Long/Spatial results are not edited.
 
+For continuation of the completed server `goal5-pilot` at step 200, use
+[CONTINUATION.md](CONTINUATION.md). It documents the paper interpretation, zero-update resume
+audit, disjoint expert validation, 1,000/3,000/6,000 cumulative checkpoints, diagnostics,
+Full-SFT control and gated evaluation commands. Long jobs are never started automatically.
+
 Current local verification is limited to CPU fixtures/source contracts. This Mac has no
 RLDS dataset, cached original pretrained OpenVLA snapshot, PyTorch, TensorFlow or CUDA.
 Real TFDS materialization, training, merging, GPU inference and rollouts remain unverified.
 No training, dataset download or evaluation has been launched. Do not interpret the code's
 presence as a successful experiment.
 
-All 25 CPU tests passed using the app's bundled Python (which includes NumPy):
+The continuation test suite uses the app's bundled Python (which includes NumPy):
 
 ```bash
 /Users/jihyekim/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m experiments.fewshot_sft.cpu_tests
@@ -87,7 +92,7 @@ remain in use. The local OFT continuous-action class loads the original pretrain
 directly; the pristine base directory is never rewritten by upstream auto-map/sync helpers.
 Training uses two images, proprio, LoRA rank 32, an 8 × 7 action chunk and no FiLM/diffusion.
 
-Five guarded source substitutions instrument finite loss/gradients and optimizer setup,
+Guarded source substitutions instrument finite loss/gradients, optimizer setup and diagnostics,
 and correct upstream zero-based checkpoint/stop bookkeeping. Thus `--max-steps 1` means
 one optimizer update, and accumulation cannot save a partial update. The shim fails when
 an expected source anchor changes. Source hashes are recorded in each training config.
@@ -121,7 +126,9 @@ The new entrypoint adds Goal and the explicit checkpoint **only within its own p
 then calls the existing `suite_common.run(..., 'nominal')`. It retains the original task
 ordering, 300-step Goal horizon, ten settling actions, full-sequence official inference,
 center crop, deterministic mean action, image preprocessing, 8-action queue and initial
-states. `pilot` bounds each task at 20 trials; `final` explicitly opts into 50. The reused
+states. The default `diagnostic` uses two trials per task (configurable 1–5). `pilot` bounds
+each task at 20 trials; `final` explicitly opts into 50. Expansion requires positive,
+complete small-checkpoint and Full-SFT control evidence. The reused
 inner manifest records the original protocol's 50-trial schedule; `selection.json` records
 the actual phase cap and the summary counts actual episode rows. Pilot and final share
 the first 20 initial states: they are not independent evaluation samples.
@@ -137,9 +144,10 @@ trials, episode lengths, seed, checkpoint step and evaluator hash are preserved.
 phases retain partial evidence and cannot be silently overwritten; they require explicit
 investigation before retrying. No full 500-episode evaluation runs automatically.
 
-Training loss observations are saved in `metrics.jsonl` and aggregated as loss curves in
-the JSON report. Held-out demonstration validation is explicitly unavailable; no training
-episode is mislabelled held-out. Real TFDS/data-loader integration remains a server check.
+Training metrics, moving averages and action/exposure diagnostics are saved in `metrics.jsonl`
+and `diagnostics.jsonl`. Extended training requires the disjoint experts prepared by
+`validation.py`; full-trajectory held-out L1 is saved in `validation.jsonl`. No training
+episode is labelled held-out. Real TFDS/data-loader integration remains a server check.
 
 ## Compatibility findings and remaining gates
 

@@ -10,13 +10,25 @@ def report():
     result = dict(audit=read(OUT/'audit.json') if (OUT/'audit.json').exists() else None,
                   datasets=[], training=[], checkpoints=[], incomplete_exports=[], evaluations=[],
                   cpu_tests=read(OUT/'cpu_tests.json') if (OUT/'cpu_tests.json').exists() else None,
-                  gpu_resource_estimate=None, validation_loss=None)
+                  gpu_resource_estimate=None, validation_loss=[])
     for path in sorted((OUT/'datasets').glob('*/dataset_audit.json')):
         result['datasets'].append(dict(path=str(path), audit=read(path), selection=read(path.parent/'selection_manifest.json')))
     for path in sorted((OUT/'runs').glob('*/training_config.json')):
         run = dict(config=read(path), runtime=read(path.parent/'runtime.json') if (path.parent/'runtime.json').exists() else None)
         metrics = path.parent/'metrics.jsonl'
         run['loss_curve'] = [json.loads(line) for line in metrics.read_text().splitlines()] if metrics.exists() else []
+        diagnostics = path.parent/'diagnostics.jsonl'
+        if diagnostics.exists():
+            rows = [json.loads(line) for line in diagnostics.read_text().splitlines()]
+            run['diagnostics_curve'] = [{k:r[k] for k in ('step','normalized_chunk_l1','moving_mean','ema','lr')} for r in rows]
+            run['action_statistics_path'] = str(diagnostics)
+            run['task_exposure'] = rows[-1]['task_exposure'] if rows else {}
+            run['exposure_known_since_step'] = rows[-1]['exposure_known_since_step'] if rows else None
+        validation = path.parent/'validation.jsonl'
+        run['validation_curve'] = [json.loads(line) for line in validation.read_text().splitlines()] if validation.exists() else []
+        result['validation_loss'].append(dict(run=str(path.parent), curve=run['validation_curve']))
+        resume = path.parent/'resume_verification.json'
+        run['resume_verification'] = read(resume) if resume.exists() else None
         result['training'].append(run)
         if run['runtime'] and run['runtime']['status'] == 'passed' and run['config']['smoke']:
             result['gpu_resource_estimate'] = dict(kind='measured one-step training; not a guarantee for larger batches',
@@ -61,6 +73,6 @@ if __name__ == '__main__':
               f'Actual prepared episodes: {result["actual_selected_episodes"]}. Target: 50 (10 tasks × 5).\n\n'
               f'Missing evidence: {", ".join(result["missing_evidence"])}.\n\n'
               'GPU memory/resource estimates require a real successful training smoke; no estimate is fabricated.\n\n'
-              'No full training, RL/scale-head training, or LIBERO-PLUS evaluation was launched.\n\n'
+              'This report command does not launch training or evaluation. Runtime files provide execution evidence.\n\n'
               '```json\n'+text+'\n```\n')
         (OUT/'fewshot_sft_summary.md').write_text(md)

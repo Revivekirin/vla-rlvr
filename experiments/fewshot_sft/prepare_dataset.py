@@ -96,12 +96,12 @@ def episode_record(episode, episode_id):
                 sha256=payload_hash(episode))
 
 
-def episodes(builder):
+def episodes(builder, split='train'):
     import tensorflow_datasets as tfds
     # Preserve original JPEG bytes. Decoding and re-encoding would change pixels.
     decoders = {'steps': {'observation': {
         'image': tfds.decode.SkipDecoding(), 'wrist_image': tfds.decode.SkipDecoding()}}}
-    ds = builder.as_dataset(split='train', shuffle_files=False,
+    ds = builder.as_dataset(split=split, shuffle_files=False,
                            read_config=tfds.ReadConfig(add_tfds_id=True), decoders=decoders)
     for e in tfds.as_numpy(ds):
         eid = e.pop('tfds_id').decode()

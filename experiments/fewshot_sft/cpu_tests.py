@@ -7,7 +7,8 @@ from .common import OUT, write
 
 if __name__ == '__main__':
     result = unittest.TextTestRunner(verbosity=2).run(
-        unittest.defaultTestLoader.loadTestsFromName('experiments.fewshot_sft.test_pipeline'))
+        unittest.defaultTestLoader.loadTestsFromNames(['experiments.fewshot_sft.test_pipeline',
+                                                      'experiments.fewshot_sft.test_continuation']))
     write(OUT/'cpu_tests.json', dict(tests=result.testsRun, executable=sys.executable,
         python=platform.python_version(),
         passed=result.testsRun-len(result.failures)-len(result.errors)-len(result.skipped),
