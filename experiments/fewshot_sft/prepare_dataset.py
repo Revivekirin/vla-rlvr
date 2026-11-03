@@ -119,6 +119,8 @@ def prepare(args):
     files = inventory(source)
     provenance = dict(repo='openvla/modified_libero_rlds', revision=args.source_revision,
                       content_sha256=digest(files), files=files)
+    import tensorflow as tf
+    tf.config.set_visible_devices([], 'GPU')
     import tensorflow_datasets as tfds
     builder = tfds.builder_from_directory(str(source))
     # Upstream 1.0.0 metadata says "libero_goal" although its directory is
@@ -145,32 +147,39 @@ def prepare(args):
     if args.dry_run:
         return
     out = destination(args.output or OUT/f'datasets/goal_{args.shots}shot_seed{args.selection_seed}')
-    require(not out.exists(), f'Refusing to overwrite dataset: {out}')
-    require(shutil.disk_usage(out.parent if out.parent.exists() else OUT.parent).free >
-            sum(v['bytes'] for v in files.values()) * len(selected)/len(records) * 3,
-            'Insufficient conservative subset storage budget')
-    out.mkdir(parents=True)
-    write(out/'selection_manifest.json', manifest)
-    wanted = {r['episode_id']: r for r in selected}
-    # Reuse the exact source FeaturesDict, including all episode and step metadata.
-    class LiberoGoalNoNoops(tfds.core.GeneratorBasedBuilder, skip_registration=True):
-        VERSION = tfds.core.Version(str(builder.version))
-        def _info(self):
-            return tfds.core.DatasetInfo(builder=self, features=builder.info.features,
-                description='Manifest-selected complete episodes from openvla/modified_libero_rlds')
-        def _split_generators(self, dl_manager):
-            return {'train': self._generate_examples()}
-        def _generate_examples(self):
-            for eid, e in episodes(builder):
-                if eid in wanted:
-                    require(episode_record(e, eid) == wanted[eid], 'Source episode changed during preparation')
-                    # Image accepts a file object containing already encoded JPEG.
-                    for step in e['steps']:
-                        for key in ('image', 'wrist_image'):
-                            step['observation'][key] = io.BytesIO(step['observation'][key])
-                    yield eid, e
-    subset = LiberoGoalNoNoops(data_dir=str(out/'rlds'))
-    subset.download_and_prepare()
+    if out.exists():
+        require(args.resume_existing, f'Refusing to overwrite dataset: {out}')
+        require(read(out/'selection_manifest.json') == manifest, 'Existing selection/provenance differs')
+        subset_path = out/'rlds'/NAME/str(builder.version)
+        require((subset_path/'dataset_info.json').is_file(), 'Existing subset TFDS is incomplete')
+        subset = tfds.builder_from_directory(str(subset_path))
+        print(f'Resuming verification of existing subset: {subset_path}', flush=True)
+    else:
+        require(shutil.disk_usage(out.parent if out.parent.exists() else OUT.parent).free >
+                sum(v['bytes'] for v in files.values()) * len(selected)/len(records) * 3,
+                'Insufficient conservative subset storage budget')
+        out.mkdir(parents=True)
+        write(out/'selection_manifest.json', manifest)
+        wanted = {r['episode_id']: r for r in selected}
+        # Reuse the exact source FeaturesDict, including all episode and step metadata.
+        class LiberoGoalNoNoops(tfds.core.GeneratorBasedBuilder, skip_registration=True):
+            VERSION = tfds.core.Version(str(builder.version))
+            def _info(self):
+                return tfds.core.DatasetInfo(builder=self, features=builder.info.features,
+                    description='Manifest-selected complete episodes from openvla/modified_libero_rlds')
+            def _split_generators(self, dl_manager):
+                return {'train': self._generate_examples()}
+            def _generate_examples(self):
+                for eid, e in episodes(builder):
+                    if eid in wanted:
+                        require(episode_record(e, eid) == wanted[eid], 'Source episode changed during preparation')
+                        # Image accepts a file object containing already encoded JPEG.
+                        for step in e['steps']:
+                            for key in ('image', 'wrist_image'):
+                                step['observation'][key] = io.BytesIO(step['observation'][key])
+                        yield eid, e
+        subset = LiberoGoalNoNoops(data_dir=str(out/'rlds'))
+        subset.download_and_prepare()
     actual = Counter(episode_record(e, eid)['sha256'] for eid, e in episodes(subset))
     require(actual == Counter(r['sha256'] for r in selected), 'Materialized episode content mismatch')
     import numpy as np
@@ -187,10 +196,17 @@ def prepare(args):
         stats[key] = dict(mean=values.mean(0).tolist(), std=values.std(0).tolist(),
                           min=values.min(0).tolist(), max=values.max(0).tolist(),
                           q01=np.quantile(values,.01,axis=0).tolist(), q99=np.quantile(values,.99,axis=0).tolist())
-    write(out/'normalization.json', stats)
+    if (out/'normalization.json').exists():
+        require(read(out/'normalization.json') == stats, 'Existing normalization differs')
+    else:
+        write(out/'normalization.json', stats)
     audit.update(status='verified_materialization', subset_dir=str(Path(subset.data_dir).relative_to(out)),
                  subset_files=inventory(out/'rlds'), normalization_sha256=digest(stats))
-    write(out/'dataset_audit.json', audit)
+    if (out/'dataset_audit.json').exists():
+        require(read(out/'dataset_audit.json') == audit, 'Existing dataset audit differs')
+    else:
+        write(out/'dataset_audit.json', audit)
+    print(f'Verified {len(selected)} complete episodes and {len(actions)} transitions: {out}', flush=True)
 
 
 def parser():
@@ -202,6 +218,7 @@ def parser():
     p.add_argument('--selection-manifest', type=Path)
     p.add_argument('--output', type=Path)
     p.add_argument('--dry-run', action='store_true')
+    p.add_argument('--resume-existing', action='store_true', help='Verify/finalize an existing matching subset without rebuilding it')
     return p
 
 

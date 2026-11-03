@@ -11,13 +11,13 @@ Real TFDS materialization, training, merging, GPU inference and rollouts remain 
 No training, dataset download or evaluation has been launched. Do not interpret the code's
 presence as a successful experiment.
 
-All 23 CPU tests passed using the app's bundled Python (which includes NumPy):
+All 24 CPU tests passed using the app's bundled Python (which includes NumPy):
 
 ```bash
 /Users/jihyekim/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m experiments.fewshot_sft.cpu_tests
 ```
 
-The system Python skips five array tests because it lacks NumPy. The recorded test evidence
+The system Python skips six array tests because it lacks NumPy. The recorded test evidence
 identifies the interpreter actually used; these fixtures do not replace real TFDS tests.
 
 ## Commands
@@ -69,6 +69,9 @@ No larger-batch memory claim is made. Smoke and export memory are separate measu
   and flattening. All step/episode metadata and temporal ordering are retained. The source
   `_no_noops` filtering is not reapplied and discarded transitions are not reconstructed.
 - Re-read and compare every materialized episode hash before marking the subset verified.
+- If execution stops after TFDS writes the subset, `prepare_dataset --resume-existing` verifies
+  the saved selection, rereads the 50 episodes, recomputes normalization, and writes only
+  missing final audit files. Existing evidence with different content is rejected.
 - `normalization.json` uses the official gripper transform and mean/std/min/max/q01/q99
   over selected episodes. A process-local statistics provider avoids the upstream shared
   statistics-cache collision. The official loader still applies the original normalization
@@ -99,6 +102,10 @@ Export uses PEFT `merge_and_unload(safe_merge=True)`, as in the official merge p
 a fresh directory. It verifies deterministic `(8,7)` actions before/after merging and
 after disk reload on fixed synthetic RGB/proprio inputs; `atol=0.02`, `rtol=0`, with raw
 outputs and errors recorded. The absolute BF16 tolerance is explicit and can be tightened.
+If merge comparison fails, `checkpoint --checkpoint PATH --diagnose-merge --execute` prints
+repeatability, maximum and per-dimension action differences without writing an export.
+The export destination is created only after the in-memory comparison passes; a failed
+older export directory remains invalid and must not be evaluated.
 This numerical smoke does not establish equivalence on all observations. Exports without
 passing evidence or with changed file hashes cannot be evaluated.
 

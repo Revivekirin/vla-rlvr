@@ -1,6 +1,7 @@
 """Export SFT LoRA without touching its source; compare fixed-input action chunks."""
 import argparse
 import gc
+import json
 import os
 from pathlib import Path
 import shutil
@@ -44,18 +45,24 @@ def main():
     p.add_argument('--checkpoint', type=Path, required=True)
     p.add_argument('--output', type=Path)
     p.add_argument('--audit-only', action='store_true')
+    p.add_argument('--diagnose-merge', action='store_true',
+                   help='Compare repeated adapter and merged actions without writing an export')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--atol', type=float, default=0.02, help='Absolute action tolerance for BF16 merge, rtol=0')
     a = p.parse_args()
     if a.audit_only:
         print(__import__('json').dumps(check(a.checkpoint), indent=2))
         return
-    require(a.output is not None, '--output required for export')
-    out = destination(a.output)
-    require(not out.exists(), 'Export destination already exists')
     m = check(a.checkpoint, merged=False)
     require(0 < a.atol <= .02, 'Merge tolerance must be positive and at most 0.02')
-    print(f'Export {a.checkpoint} -> {out}; fixed input comparison atol={a.atol}, rtol=0')
+    if a.diagnose_merge:
+        require(a.output is None, '--diagnose-merge does not take an output destination')
+        print(f'Diagnose merge of {a.checkpoint}; atol={a.atol}, rtol=0')
+    else:
+        require(a.output is not None, '--output required for export')
+        out = destination(a.output)
+        require(not out.exists(), 'Export destination already exists')
+        print(f'Export {a.checkpoint} -> {out}; fixed input comparison atol={a.atol}, rtol=0')
     if not a.execute:
         return
     os.environ.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1')
@@ -70,19 +77,14 @@ def main():
     require(inventory(m['base_snapshot']) == m['base_files'], 'Pretrained snapshot has changed')
     torch.cuda.reset_peak_memory_stats()
     started = time.monotonic()
-    out.mkdir(parents=True)
-    # Only the small auxiliary artifacts are copied; no existing checkpoint is mutated.
-    for f in a.checkpoint.iterdir():
-        if f.is_file() and f.name != 'optimizer.pt':
-            shutil.copy2(f, out/f.name)
-    cfg = SimpleNamespace(pretrained_checkpoint=str(out), use_l1_regression=True, use_diffusion=False,
+    cfg = SimpleNamespace(pretrained_checkpoint=str(a.checkpoint), use_l1_regression=True, use_diffusion=False,
         use_film=False, use_proprio=True, num_images_in_input=2, center_crop=True,
         unnorm_key=NAME, num_open_loop_steps=8)
     utils.model_is_on_hf_hub = lambda _: False
     base = OpenVLAForActionPrediction.from_pretrained(m['base_snapshot'], torch_dtype=torch.bfloat16,
                                                      low_cpu_mem_usage=True).cuda()
     base.vision_backbone.set_num_images_in_input(2)
-    base.norm_stats = read(out/'dataset_statistics.json')
+    base.norm_stats = read(a.checkpoint/'dataset_statistics.json')
     model = PeftModel.from_pretrained(base, a.checkpoint/'lora_adapter').eval()
     head = utils.get_action_head(cfg, base.llm_dim)
     proprio = utils.get_proprio_projector(cfg, base.llm_dim, proprio_dim=8)
@@ -97,9 +99,30 @@ def main():
         require(actions.shape == (8, 7) and np.isfinite(actions).all(), 'Invalid action chunk')
         return actions
     before = predict(model)
+    before_repeat = predict(model)
+    repeat_error = float(np.max(np.abs(before-before_repeat)))
+    repeat_passed = bool(np.allclose(before, before_repeat, atol=a.atol, rtol=0))
+    if not a.diagnose_merge:
+        require(repeat_passed,
+                f'Repeated unmerged inference differs: max_abs_error={repeat_error:.6g}')
     merged = model.merge_and_unload(safe_merge=True).eval()
     after = predict(merged)
-    require(np.allclose(before, after, atol=a.atol, rtol=0), 'Before/after merge action discrepancy')
+    merge_error = float(np.max(np.abs(before-after)))
+    if a.diagnose_merge:
+        print(json.dumps(dict(passed=repeat_passed and bool(np.allclose(before, after, atol=a.atol, rtol=0)),
+            atol=a.atol, repeated_unmerged_passed=repeat_passed,
+            repeat_error=repeat_error, max_merge_error=merge_error,
+            per_action_dimension_max_error=np.max(np.abs(before-after), axis=0).tolist(),
+            before=before.tolist(), after=after.tolist()), indent=2))
+        return
+    require(np.allclose(before, after, atol=a.atol, rtol=0),
+            f'Before/after merge action discrepancy: max_abs_error={merge_error:.6g}; '
+            'run --diagnose-merge --execute for full values')
+    out.mkdir(parents=True)
+    # Only the small auxiliary artifacts are copied; no existing checkpoint is mutated.
+    for f in a.checkpoint.iterdir():
+        if f.is_file() and f.name != 'optimizer.pt':
+            shutil.copy2(f, out/f.name)
     merged.save_pretrained(out)
     processor.save_pretrained(out)
     # Install the audited local OFT inference class into this new export only.
@@ -118,7 +141,7 @@ def main():
     write(out/'merge_verification.json', dict(passed=True, atol=a.atol, rtol=0, input_seed=42,
         input_description='fixed synthetic RGB pair, zero proprio, put the bowl on the plate',
         before=before.tolist(), after=after.tolist(), reloaded=reloaded_actions.tolist(),
-        max_merge_error=float(np.max(np.abs(before-after))),
+        max_merge_error=merge_error, repeat_error=repeat_error,
         max_reload_error=float(np.max(np.abs(after-reloaded_actions))),
         elapsed_seconds=time.monotonic()-started, peak_reserved_bytes=torch.cuda.max_memory_reserved()))
     interface = ROOT/'runtime/ript-vla/ript/algos/rl_optimizers/openvla_oft_interface.py'
