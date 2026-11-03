@@ -78,6 +78,14 @@ Full-sequence SFT versus cached inference is never an isolated RL effect.
 
 ## Setup and CLI
 
+NumPy 1.26.4 and Matplotlib 3.9.0 match the pinned RIPT requirements. If an earlier
+version of this package installed Matplotlib 3.9.4, restore the shared environment:
+
+```bash
+python -m pip install "numpy==1.26.4" "matplotlib==3.9.0"
+python -m pip check
+```
+
 ```bash
 python -m pip install -r experiments/shot_scaling/requirements.txt
 python -m experiments.shot_scaling inspect

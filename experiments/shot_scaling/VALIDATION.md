@@ -1,5 +1,13 @@
 # Validation evidence — 2026-11-03
 
+Dependency compatibility correction: the original Matplotlib 3.9.4 pin conflicted with
+RIPT's required 3.9.0. Requirements now pin Matplotlib 3.9.0 and NumPy 1.26.4 to match
+`runtime/ript-vla/requirements.txt`. All 15 shot-scaling CPU tests, including PNG/SVG
+plot generation, passed again with those versions (1.764 seconds, Python 3.12.14).
+This local check does not certify the user's complete server environment; run `python -m
+pip check` there after restoring these versions. The original smoke evidence below retains
+the versions actually used for that earlier run.
+
 Execution host: local macOS checkout, Python 3.12.14 at
 `/tmp/libero-pipeline-venv/bin/python`. Hydra 1.3.2, OmegaConf 2.3.1, NumPy 2.3.5,
 Matplotlib 3.9.4. TensorFlow, TFDS and PyTorch are absent. Dependencies were installed
