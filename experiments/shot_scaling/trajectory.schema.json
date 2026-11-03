@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LIBERO comparison trajectory v1 (future evaluator export contract)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite", "task", "episode_id", "source", "checkpoint", "inference_mode", "initial_state_id", "coordinate_convention", "steps", "success", "episode_length", "provenance"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "suite": {"enum": ["goal", "spatial", "long"]},
+    "task": {"type": "string"},
+    "episode_id": {"type": "string"},
+    "source": {"enum": ["expert", "SFT", "pre-RL D0", "post-RL D1"]},
+    "checkpoint": {"type": ["object", "null"], "required": ["sha256", "parent_sft_sha256"], "properties": {"sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "parent_sft_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}},
+    "inference_mode": {"enum": [null, "expert_recorded", "sft_full", "d0_cached", "d1_cached"]},
+    "initial_state_id": {"type": ["string", "null"], "description": "Official reset/init-state identifier when available, not row index or a fabricated episode identifier."},
+    "coordinate_convention": {"type": "object", "required": ["eef_frame", "position_units", "orientation_representation", "action_convention", "state_timing"], "properties": {"eef_frame": {"type": ["string", "null"]}, "position_units": {"type": ["string", "null"]}, "orientation_representation": {"type": ["string", "null"]}, "action_convention": {"type": ["string", "null"]}, "state_timing": {"enum": ["pre_action", "post_action", "unknown"]}}},
+    "steps": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["index", "observation_state", "executed_action", "eef_pose", "gripper", "terminal"], "properties": {"index": {"type": "integer", "minimum": 0}, "timestamp_seconds": {"type": ["number", "null"]}, "observation_state": {"type": ["array", "null"], "items": {"type": "number"}}, "executed_action": {"type": "array", "minItems": 7, "maxItems": 7, "items": {"type": "number"}}, "eef_pose": {"type": ["object", "null"], "required": ["position", "orientation"], "properties": {"position": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}, "orientation": {"type": "array", "items": {"type": "number"}}}}, "gripper": {"type": "object", "required": ["state", "command"], "properties": {"state": {"type": ["array", "null"], "items": {"type": "number"}}, "command": {"type": "number"}}}, "terminal": {"type": ["boolean", "null"]}, "reward": {"type": ["number", "null"]}}}},
+    "success": {"type": ["boolean", "null"], "description": "Explicit task-success outcome; do not infer from terminal alone."},
+    "episode_length": {"type": "integer", "minimum": 1, "description": "Must equal steps length; exporter must verify contiguous indices and finite numeric values."},
+    "provenance": {"type": "object", "required": ["dataset_revision", "source_episode_id", "evaluator_revision", "eval_seed"], "properties": {"dataset_revision": {"type": ["string", "null"]}, "source_episode_id": {"type": ["string", "null"]}, "evaluator_revision": {"type": ["string", "null"]}, "eval_seed": {"type": ["integer", "null"]}}}
+  },
+  "description": "Nullable unavailable fields must remain null. Expert actions are recorded dataset commands; policy actions must be exactly those passed to env.step after transforms/clipping. Reuse existing evaluators; no new rollout collector. Exporters must additionally enforce source/inference/checkpoint consistency, step count, contiguous indices, units and finite values. No reconstructed EEF paths from actions."
+}
