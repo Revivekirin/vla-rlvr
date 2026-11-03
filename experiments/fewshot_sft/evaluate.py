@@ -13,13 +13,17 @@ def main():
     p.add_argument('--phase', choices=['smoke', 'pilot', 'final'], default='pilot')
     p.add_argument('--seed', type=int, default=1)
     p.add_argument('--selection-note', required=True, help='Record checkpoint choice and any previous nominal tuning')
+    p.add_argument('--run-label', help='Fresh output suffix for a retry; prior failed evidence is kept')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--dry-run', action='store_true')
     a = p.parse_args()
+    require(a.run_label is None or (a.run_label and
+            all(c.isalnum() or c in '-_' for c in a.run_label)), 'Unsafe run label')
     m = check_export(a.checkpoint)
     if m.get('export_format') == 'adapter':
         require(inventory(m['base_snapshot']) == m['base_files'], 'Pretrained base changed after adapter export')
-    out = destination(OUT/f'eval/goal_{m["shots"]}shot_seed{m["selection_seed"]}'/a.checkpoint.name/a.phase)
+    phase_name = a.phase if a.run_label is None else f'{a.phase}-{a.run_label}'
+    out = destination(OUT/f'eval/goal_{m["shots"]}shot_seed{m["selection_seed"]}'/a.checkpoint.name/phase_name)
     require(not out.exists(), 'Evaluation phase output already exists; no overwrites')
     trials = {'smoke': 1, 'pilot': 20, 'final': 50}[a.phase]
     print(json.dumps(dict(output=str(out), tasks=1 if a.phase=='smoke' else 10,
@@ -34,7 +38,9 @@ def main():
     benchmark = ROOT/'vendor/LIBERO'
     preflight = nominal.preflight('goal', 'sft', 'nominal', benchmark)
     require(preflight['ready'], str(preflight['errors']))
-    write(out/'selection.json', dict(phase=a.phase, note=a.selection_note, checkpoint=str(a.checkpoint.resolve()),
+    write(out/'selection.json', dict(phase=a.phase, run_label=a.run_label, note=a.selection_note,
+        action_bound_policy='Official OFT pass-through; no clipping; action magnitudes recorded',
+        checkpoint=str(a.checkpoint.resolve()),
         checkpoint_step=m['step'], checkpoint_metadata_sha256=sha(a.checkpoint/'fewshot_checkpoint.json'),
         evaluator_sha256=sha(Path(nominal.__file__)), wrapper_sha256=sha(__file__),
         trials_per_task=trials, seed=a.seed, nominal_model_selection_recorded=True))
@@ -64,7 +70,8 @@ def main():
             return model, head, proprio, None, processor
         oft.initialize_model = initialize_model
     args = argparse.Namespace(suite='goal', model='sft', seed=a.seed, benchmark=benchmark, output=out,
-        task_ids=None, max_tasks=1 if a.phase=='smoke' else None, max_trials=trials, check_import=False)
+        task_ids=None, max_tasks=1 if a.phase=='smoke' else None, max_trials=trials,
+        allow_unbounded_actions=True, check_import=False)
     nominal.run(args, 'nominal')
 
 

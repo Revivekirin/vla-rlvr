@@ -125,6 +125,11 @@ states. `pilot` bounds each task at 20 trials; `final` explicitly opts into 50. 
 inner manifest records the original protocol's 50-trial schedule; `selection.json` records
 the actual phase cap and the summary counts actual episode rows. Pilot and final share
 the first 20 initial states: they are not independent evaluation samples.
+For this few-shot path only, finite actions are passed through exactly as in official OFT,
+without the shared evaluator's extra unit-bound guard or clipping. Per-episode maximum
+action magnitude and out-of-range action count are recorded. Existing evaluators keep
+their original guard. `--run-label` creates a new phase directory for a retry while
+preserving failed evidence.
 
 Each phase requires a checkpoint-selection note. All evaluated checkpoints/notes are
 retained by the report, so nominal-driven checkpoint tuning is visible. Per-task success,

@@ -259,6 +259,9 @@ def run(args, dataset):
                     'task_mapping': entries, 'benchmark_revision': preflight(args.suite,args.model,dataset,args.benchmark)['benchmark_revision'],
                     'evaluator_sha256': sha(__file__), 'checkpoint': checkpoint_provenance(checkpoint_paths(args.suite,args.model)),
                     'python': platform.python_version()}
+        allow_unbounded_actions = bool(getattr(args, 'allow_unbounded_actions', False))
+        if allow_unbounded_actions:
+            manifest['action_bound_policy'] = 'Official OFT action pass-through; finite shape checked, no clipping'
         mp = output/'manifest.json'
         if mp.exists():
             require(json.loads(mp.read_text()) == manifest, 'Resume manifest mismatch')
@@ -304,6 +307,8 @@ def run(args, dataset):
                     obs,_,_,_ = env.step(oft.get_libero_dummy_action('openvla'))
                 queue = deque()
                 success = False
+                max_abs_executed_action = 0.0
+                actions_outside_unit_bounds = 0
                 with torch.inference_mode():
                     for step in range(horizon):
                         if not queue:
@@ -316,8 +321,12 @@ def run(args, dataset):
                             require(actions.shape == (8,7) and np.isfinite(actions).all(), 'Invalid action chunk')
                             queue.extend(actions)
                         action = oft.process_action(queue.popleft(),'openvla')
-                        require(action.shape == (7,) and np.isfinite(action).all() and
-                                np.max(np.abs(action)) <= 1.0001, 'Invalid executed action')
+                        require(action.shape == (7,) and np.isfinite(action).all(), 'Invalid executed action')
+                        action_magnitude = float(np.max(np.abs(action)))
+                        max_abs_executed_action = max(max_abs_executed_action, action_magnitude)
+                        actions_outside_unit_bounds += action_magnitude > 1.0001
+                        require(allow_unbounded_actions or action_magnitude <= 1.0001,
+                                'Invalid executed action')
                         obs,_,done,_ = env.step(action.tolist())
                         if done:
                             success = True
@@ -330,6 +339,9 @@ def run(args, dataset):
                        'benchmark_revision':manifest['benchmark_revision'],
                        'evaluator_sha256':manifest['evaluator_sha256'], 'runtime':runtime,
                        'host':platform.node()}
+                if allow_unbounded_actions:
+                    row.update(max_abs_executed_action=max_abs_executed_action,
+                               actions_outside_unit_bounds=actions_outside_unit_bounds)
                 dest = result_path(output,entry['id'],trial,dataset)
                 require(not dest.exists(), 'Refusing to overwrite result')
                 goal.write_result(dest,row)
