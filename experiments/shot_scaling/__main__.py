@@ -50,7 +50,10 @@ def historical_sft_command(c):
 
 
 def commands():
-    return '''# Set paths to real, externally extracted inventory/trajectory artifacts (see README).
+    return '''# Goal raw-RLDS extraction smoke (read-only; no complete inventory emitted).
+python -m experiments.shot_scaling dataset-analyze --source data/data/modified_libero_rlds/libero_goal_no_noops/1.0.0 --source-revision a7c9ae18499b6eea8a32f78a9302327b752b1b5f --selection outputs/fewshot_sft/datasets/goal_5shot_seed42/selection_manifest.json --max-episodes 2 suite=goal shots=5 selection_seed=42
+# After smoke passes, remove --max-episodes 2 to extract the full source and analyze historical Goal5.
+# Alternatively, use existing extracted JSON artifacts:
 python -m experiments.shot_scaling dataset-analyze --inventory "$GOAL_INVENTORY" --trajectories "$GOAL_TRAJECTORIES" --selection "$HISTORICAL_GOAL5_MANIFEST" suite=goal
 for shot in 1 2 5 10 20 Full; do
   python -m experiments.shot_scaling prepare --inventory "$GOAL_INVENTORY" suite=goal shots=$shot selection_seed=42
@@ -84,6 +87,9 @@ def main(argv=None):
     p.add_argument('--inventory', type=input_file)
     p.add_argument('--trajectories', type=input_file)
     p.add_argument('--selection', type=input_file)
+    p.add_argument('--source', help='Original Goal TFDS version directory; read-only CPU extraction')
+    p.add_argument('--source-revision', help='Explicit pinned HF dataset commit for --source')
+    p.add_argument('--max-episodes', type=int, help='Bounded extraction smoke only; does not emit analysis/inventory')
     p.add_argument('--input', type=input_file)
     p.add_argument('--resume', type=input_file, help='Verify an existing selection file exactly; never overwrite')
     p.add_argument('--historical', action='store_true', help='Reuse existing suite report, preserving released provenance')
@@ -92,6 +98,9 @@ def main(argv=None):
     p.add_argument('overrides', nargs='*', help='Hydra overrides, e.g. suite=long shots=Full')
     a = p.parse_intermixed_args(argv)
     c = config(a.overrides)
+    require(a.source is None or a.command == 'dataset-analyze', '--source belongs to dataset-analyze')
+    require(a.source is not None or (a.source_revision is None and a.max_episodes is None),
+            '--source-revision/--max-episodes require --source')
     if a.commands:
         require(a.command == 'inspect', '--commands belongs to inspect')
         print(commands())
@@ -119,16 +128,32 @@ def main(argv=None):
         write(out/'selection.json', result)
     elif a.command == 'dataset-analyze':
         from .analysis import analyze, save
-        require(a.inventory is not None and a.trajectories is not None,
-                'BLOCKED: --inventory and --trajectories required; raw RLDS extractor is not integrated')
-        inventory = read(a.inventory)
-        require(inventory['suite'] == c['suite']['name'], 'Configured suite mismatch')
         selection = read(a.selection) if a.selection else None
         if selection:
             require(selection['shots'] == c['shots'] and selection['selection_seed'] == c['selection_seed'],
                     'Configured selection mismatch')
-        result = analyze(inventory, read(a.trajectories), selection)
-        out = run_dir(c, a.command, [a.inventory, a.trajectories]+([a.selection] if a.selection else []))
+        if a.source is not None:
+            from .extract import extract
+            require(a.source.strip(), 'Empty --source path')
+            require(a.inventory is None and a.trajectories is None, 'Use --source or artifact inputs, not both')
+            require(c['suite']['name'] == 'goal', 'Raw extraction currently supports Goal only')
+            inventory, trajectories = extract(a.source, a.source_revision, selection, a.max_episodes)
+            out = run_dir(c, a.command, [Path(a.source)/'dataset_info.json']+([a.selection] if a.selection else []))
+            if a.max_episodes is not None:
+                write(out/'extraction_smoke.json', dict(inventory, source=str(Path(a.source).resolve()),
+                                                     revision=a.source_revision))
+                write(out/'completion.json', dict(status='COMPLETE', scope='Bounded extraction smoke only'))
+                print(out)
+                return 0
+            write(out/'inventory.json', inventory)
+            write(out/'trajectories.json', trajectories)
+        else:
+            require(a.inventory is not None and a.trajectories is not None,
+                    'Supply --source with --source-revision, or --inventory and --trajectories')
+            inventory, trajectories = read(a.inventory), read(a.trajectories)
+            require(inventory['suite'] == c['suite']['name'], 'Configured suite mismatch')
+            out = run_dir(c, a.command, [a.inventory, a.trajectories]+([a.selection] if a.selection else []))
+        result = analyze(inventory, trajectories, selection)
         save(out, result)
     elif a.command == 'aggregate':
         if a.historical:

@@ -1,5 +1,12 @@
 # Validation evidence — 2026-11-03
 
+Goal extraction update: 19 CPU tests passed (16 existing plus 3 extraction tests).
+New tests cover historical payload/ID preservation through extraction and analysis,
+bounded smoke isolation, source-count mismatch and historical payload mismatch.
+The extractor reuses the existing TFDS decoder unchanged, but local TensorFlow/TFDS and
+real RLDS are unavailable; actual server decoding is not claimed as tested. Run the
+documented two-episode extraction smoke before full CPU analysis.
+
 Input-path regression: the CLI now rejects empty/unset environment-variable arguments,
 directories and nonexistent files with an option-specific parser error before dispatch.
 All 16 CPU tests passed, including these cases for every file-input option.

@@ -1,5 +1,34 @@
 # Unified LIBERO shot scaling: CPU foundation and integration audit
 
+## Goal raw-RLDS extraction update
+
+`dataset-analyze --source` now extracts the original Goal RLDS on CPU using the existing
+historical `episodes()` decoder and `episode_record()` validator. It hashes source files
+before and after traversal, preserves exact TFDS IDs/full-payload hashes, validates train
+split counts and all ten task identities, and checks the supplied historical selection.
+Source revision is an explicit provenance declaration; remote bytes are not authenticated.
+The new path has fixture tests; **real server TFDS integration still requires the bounded
+smoke below**. Spatial/Long raw extraction and all-suite training materialization remain blocked.
+
+From the server repository root, after syncing this code:
+
+```bash
+python -m experiments.shot_scaling dataset-analyze \
+  --source data/data/modified_libero_rlds/libero_goal_no_noops/1.0.0 \
+  --source-revision a7c9ae18499b6eea8a32f78a9302327b752b1b5f \
+  --selection outputs/fewshot_sft/datasets/goal_5shot_seed42/selection_manifest.json \
+  --max-episodes 2 suite=goal shots=5 selection_seed=42
+```
+
+This checks two episodes and source file hashes, but does not certify all selected episode
+payloads or publish a complete inventory. After it passes, repeat without `--max-episodes 2`
+to extract/analyze the full source. No environment-variable placeholders are required.
+The full operation prints a new run directory containing `inventory.json`, `trajectories.json`,
+`analysis.json`, `episodes.csv` and a completion marker. Original RLDS/selection files are
+read-only. Use the printed `analysis.json` path with `plot --input`. Interrupted extraction
+must be rerun; it does not resume a partial TFDS traversal. Earlier artifact-only limitations
+below now apply only to non-Goal raw extraction.
+
 This is a **partial implementation stopped at unvalidated integration gates**, not a working
 end-to-end training pipeline. It adds an isolated orchestration package and preserves the
 existing trainers, evaluators, historical sampler, checkpoints, and experiment results.
