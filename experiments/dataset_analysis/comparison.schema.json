@@ -1,0 +1,445 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LIBERO measured-trajectory comparison contract v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite",
+    "task",
+    "episode_id",
+    "source",
+    "checkpoint",
+    "inference_mode",
+    "initial_state_id",
+    "coordinate_convention",
+    "steps",
+    "success",
+    "episode_length",
+    "provenance",
+    "comparison_family"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "suite": {
+      "enum": [
+        "goal",
+        "spatial",
+        "long"
+      ]
+    },
+    "task": {
+      "type": "string"
+    },
+    "episode_id": {
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "expert",
+        "released_full_sft",
+        "released_scale_cached",
+        "released_ript_cached",
+        "new_sft_full",
+        "new_pre_rl_d0",
+        "new_post_rl_d1"
+      ]
+    },
+    "checkpoint": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "sha256",
+        "parent_sft_sha256"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "parent_sft_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "inference_mode": {
+      "enum": [
+        "expert_recorded",
+        "sft_full",
+        "scale_cached",
+        "ript_cached",
+        "d0_cached",
+        "d1_cached"
+      ]
+    },
+    "initial_state_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Official reset/init-state identifier when available, not row index or a fabricated episode identifier."
+    },
+    "coordinate_convention": {
+      "type": "object",
+      "required": [
+        "eef_frame",
+        "position_units",
+        "orientation_representation",
+        "action_convention",
+        "state_timing"
+      ],
+      "properties": {
+        "eef_frame": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position_units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "orientation_representation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action_convention": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state_timing": {
+          "enum": [
+            "pre_action",
+            "post_action",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "observation_state",
+          "executed_action",
+          "eef_pose",
+          "gripper",
+          "terminal"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timestamp_seconds": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "observation_state": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            }
+          },
+          "executed_action": {
+            "type": "array",
+            "minItems": 7,
+            "maxItems": 7,
+            "items": {
+              "type": "number"
+            }
+          },
+          "eef_pose": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "position",
+              "orientation"
+            ],
+            "properties": {
+              "position": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "orientation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "gripper": {
+            "type": "object",
+            "required": [
+              "state",
+              "command"
+            ],
+            "properties": {
+              "state": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "number"
+                }
+              },
+              "command": {
+                "type": "number"
+              }
+            }
+          },
+          "terminal": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reward": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "success": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Explicit task-success outcome; do not infer from terminal alone."
+    },
+    "episode_length": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Must equal steps length; exporter must verify contiguous indices and finite numeric values."
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "dataset_revision",
+        "source_episode_id",
+        "evaluator_revision",
+        "eval_seed"
+      ],
+      "properties": {
+        "dataset_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_episode_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evaluator_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eval_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "comparison_family": {
+      "enum": [
+        "expert_descriptive",
+        "released_checkpoint",
+        "new_shot_scaling"
+      ]
+    }
+  },
+  "description": "Reuse existing evaluators without changing inference. EEF pose must be measured from observations, never integrated commands. Record exact env.step actions. Released Scale-cached versus RIPT-cached is matched-inference evidence, distinct from newly trained D0/D1. Full-SFT versus cached inference does not isolate RL. Exporters must enforce array lengths, finite values, exact initialization and checkpoint lineage, unit/frame/timing evidence, and source split identities. Unknown physical fields stay null.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "expert"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "expert_recorded"
+          },
+          "comparison_family": {
+            "const": "expert_descriptive"
+          },
+          "checkpoint": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "released_full_sft"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "sft_full"
+          },
+          "comparison_family": {
+            "const": "released_checkpoint"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "released_scale_cached"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "scale_cached"
+          },
+          "comparison_family": {
+            "const": "released_checkpoint"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "released_ript_cached"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "ript_cached"
+          },
+          "comparison_family": {
+            "const": "released_checkpoint"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "new_sft_full"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "sft_full"
+          },
+          "comparison_family": {
+            "const": "new_shot_scaling"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "new_pre_rl_d0"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "d0_cached"
+          },
+          "comparison_family": {
+            "const": "new_shot_scaling"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "new_post_rl_d1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "inference_mode": {
+            "const": "d1_cached"
+          },
+          "comparison_family": {
+            "const": "new_shot_scaling"
+          },
+          "checkpoint": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
+}
