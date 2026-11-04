@@ -260,6 +260,8 @@ def run(args, dataset):
                     'evaluator_sha256': sha(__file__), 'checkpoint': checkpoint_provenance(checkpoint_paths(args.suite,args.model)),
                     'python': platform.python_version()}
         allow_unbounded_actions = bool(getattr(args, 'allow_unbounded_actions', False))
+        if getattr(args, 'log_eef', False):
+            manifest['eef_logging'] = 'pre/post raw simulator pose; includes settling; v1'
         if allow_unbounded_actions:
             manifest['action_bound_policy'] = 'Official OFT action pass-through; finite shape checked, no clipping'
         mp = output/'manifest.json'
@@ -300,12 +302,19 @@ def run(args, dataset):
             state_idx = trial if dataset == 'nominal' else 0
             require(state_idx < len(states), f'Missing initial state {state_idx} for task {entry["id"]}')
             env, language = oft.get_libero_env(task,'openvla',resolution=256)
+            if getattr(args, 'log_eef', False):
+                from experiments.dataset_analysis.pose_logging import PoseLogger
+                env = PoseLogger(env, output/'eef'/f'task-{entry["id"]:04d}-trial-{trial:03d}',
+                    dict(suite=args.suite, dataset=dataset, task=entry['name'], trial=trial,
+                         model=args.model, comparison_family='released_checkpoint', seed=args.seed,
+                         inference='sft_full' if args.model=='sft' else 'cached', manifest=manifest))
             try:
                 env.reset()
                 obs = env.set_init_state(states[state_idx])
                 for _ in range(10):
                     obs,_,_,_ = env.step(oft.get_libero_dummy_action('openvla'))
                 queue = deque()
+                if getattr(args, 'log_eef', False): env.phase = 'policy'
                 success = False
                 max_abs_executed_action = 0.0
                 actions_outside_unit_bounds = 0
@@ -347,8 +356,12 @@ def run(args, dataset):
                 goal.write_result(dest,row)
                 require(json.loads(dest.read_text()) == row, 'Result save/reload mismatch')
                 print(json.dumps({'task_id':entry['id'],'trial':trial,'success':success,'steps':step+1}),flush=True)
+                if getattr(args, 'log_eef', False): env.finished = True
             finally:
-                env.close()
+                try:
+                    if getattr(args, 'log_eef', False): env.save()
+                finally:
+                    env.close()
 
 
 def cli(dataset):
@@ -364,6 +377,7 @@ def cli(dataset):
     parser.add_argument('--check-import', action='store_true')
     parser.add_argument('--dry-run', action='store_true', help='Explicit CPU-only preflight (also the default)')
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--log-eef', action='store_true', help='Save raw pre/post EEF poses for every env.step; use a fresh output')
     args = parser.parse_args()
     args.benchmark = args.benchmark.resolve()
     require(args.max_tasks is None or args.max_tasks > 0, 'max-tasks must be positive')

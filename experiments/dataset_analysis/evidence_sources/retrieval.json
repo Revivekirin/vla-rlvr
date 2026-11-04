@@ -1,0 +1,44 @@
+[
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/builder_LIBERO_Goal_LIBERO_Goal_dataset_builder.py",
+    "url": "https://raw.githubusercontent.com/moojink/rlds_dataset_builder/6174b0b6bb69df6361f1117944952bf14afb0cc3/LIBERO_Goal/LIBERO_Goal_dataset_builder.py",
+    "revision": "6174b0b6bb69df6361f1117944952bf14afb0cc3",
+    "provenance": "Retrieved reference revision; not established as the producer revision of the pinned RLDS"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/builder_LIBERO_Spatial_LIBERO_Spatial_dataset_builder.py",
+    "url": "https://raw.githubusercontent.com/moojink/rlds_dataset_builder/6174b0b6bb69df6361f1117944952bf14afb0cc3/LIBERO_Spatial/LIBERO_Spatial_dataset_builder.py",
+    "revision": "6174b0b6bb69df6361f1117944952bf14afb0cc3",
+    "provenance": "Retrieved reference revision; not established as the producer revision of the pinned RLDS"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/builder_LIBERO_10_LIBERO_10_dataset_builder.py",
+    "url": "https://raw.githubusercontent.com/moojink/rlds_dataset_builder/6174b0b6bb69df6361f1117944952bf14afb0cc3/LIBERO_10/LIBERO_10_dataset_builder.py",
+    "revision": "6174b0b6bb69df6361f1117944952bf14afb0cc3",
+    "provenance": "Retrieved reference revision; not established as the producer revision of the pinned RLDS"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/builder_LICENSE",
+    "url": "https://raw.githubusercontent.com/moojink/rlds_dataset_builder/6174b0b6bb69df6361f1117944952bf14afb0cc3/LICENSE",
+    "revision": "6174b0b6bb69df6361f1117944952bf14afb0cc3",
+    "provenance": "Retrieved reference revision; not established as the producer revision of the pinned RLDS"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/robosuite_robosuite_robots_single_arm.py",
+    "url": "https://raw.githubusercontent.com/ARISE-Initiative/robosuite/v1.4.1/robosuite/robots/single_arm.py",
+    "revision": "v1.4.1",
+    "provenance": "Matches recorded package version, not an authenticated dataset-generation environment"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/robosuite_robosuite_utils_transform_utils.py",
+    "url": "https://raw.githubusercontent.com/ARISE-Initiative/robosuite/v1.4.1/robosuite/utils/transform_utils.py",
+    "revision": "v1.4.1",
+    "provenance": "Matches recorded package version, not an authenticated dataset-generation environment"
+  },
+  {
+    "path": "experiments/dataset_analysis/evidence_sources/robosuite_LICENSE",
+    "url": "https://raw.githubusercontent.com/ARISE-Initiative/robosuite/v1.4.1/LICENSE",
+    "revision": "v1.4.1",
+    "provenance": "Matches recorded package version, not an authenticated dataset-generation environment"
+  }
+]

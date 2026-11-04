@@ -90,6 +90,8 @@ def run(args, entries):
                     action_chunk=8, sampling=False, protocol='goal-plus-v1',
                     evaluator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
     manifest_path = out / 'manifest.json'
+    if getattr(args, 'log_eef', False):
+        manifest['eef_logging'] = 'pre/post raw simulator pose; includes settling; v1'
     if manifest_path.exists():
         if json.loads(manifest_path.read_text()) != manifest:
             raise ValueError('Resume manifest mismatch; use a new output directory')
@@ -151,12 +153,19 @@ def run(args, entries):
         oft.set_seed_everywhere(args.seed)
         task = suite.get_task(entry['id'] - 1)
         env, language = oft.get_libero_env(task, 'openvla', resolution=256)
+        if getattr(args, 'log_eef', False):
+            from experiments.dataset_analysis.pose_logging import PoseLogger
+            env = PoseLogger(env, out/'eef'/f'task-{entry["id"]:04d}',
+                dict(suite='goal', dataset='plus', task=entry['name'], trial=0,
+                     model=args.model, comparison_family='released_checkpoint', seed=args.seed,
+                     inference='sft_full' if args.model=='sft' else 'cached', manifest=manifest))
         try:
             env.reset()
             obs = env.set_init_state(suite.get_task_init_states(entry['id'] - 1)[0])
             for _ in range(10):
                 obs, _, _, _ = env.step(oft.get_libero_dummy_action('openvla'))
             queue = deque()
+            if getattr(args, 'log_eef', False): env.phase = 'policy'
             success = False
             with torch.inference_mode():
                 for step in range(300):
@@ -177,8 +186,12 @@ def run(args, entries):
             path = out / f"task-{entry['id']:04d}.json"
             write_result(path, row)
             print(json.dumps(row), flush=True)
+            if getattr(args, 'log_eef', False): env.finished = True
         finally:
-            env.close()  # Exceptions abort; unfinished task is retried on resume.
+            try:
+                if getattr(args, 'log_eef', False): env.save()
+            finally:
+                env.close()  # Exceptions abort; unfinished task is retried on resume.
 
 
 def main():
@@ -189,6 +202,7 @@ def main():
     parser.add_argument('--plus', type=Path, default=ROOT / 'vendor/LIBERO-plus')
     parser.add_argument('--output', type=Path, default=ROOT / 'outputs/libero-plus')
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--log-eef', action='store_true', help='Save raw pre/post EEF poses; use fresh output')
     parser.add_argument('--check-import', action='store_true')
     args = parser.parse_args()
     args.plus = args.plus.resolve()

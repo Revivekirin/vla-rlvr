@@ -43,21 +43,24 @@ def plot(bundle_path,output):
             axes[row,2].set(xlabel='Initial X (m)',ylabel='Initial Y (m)',title=f'{s}: initial positions, stratified by task');axes[row,2].legend(ncol=5,fontsize=6)
         else:unavailable(axes[row,2])
     save(fig,'figure_1_dataset_overview','Figure 1 — Actual expert dataset overview (train split; all split counts in report)')
-    fig=plt.figure(figsize=(15,11))
+    fig=plt.figure(figsize=(19,11))
     for row,s in enumerate(suites):
         task,rows=representative(s);paths=[e for e in rows if e['xyz'] is not None]
         display=sorted(paths,key=lambda e:digest(e['episode_id']))[:8];chosen[s]={'task':task,'trajectory_ids':[e['episode_id'] for e in display]}
-        ax3=fig.add_subplot(3,3,row*3+1,projection='3d');axxy=fig.add_subplot(3,3,row*3+2);axxz=fig.add_subplot(3,3,row*3+3)
+        ax3=fig.add_subplot(3,4,row*4+1,projection='3d');axxy=fig.add_subplot(3,4,row*4+2);axxz=fig.add_subplot(3,4,row*4+3);axyz=fig.add_subplot(3,4,row*4+4)
         if not display:
-            ax3.text2D(.1,.5,f'{s}: physical paths UNAVAILABLE',transform=ax3.transAxes);unavailable(axxy);unavailable(axxz)
+            ax3.set_axis_off()
+            ax3.text2D(.05,.5,f'{s}: physical paths BLOCKED\nRLDS coordinate evidence incomplete\nSee physical_convention_evidence.json',transform=ax3.transAxes)
+            for ax in (axxy,axxz,axyz):unavailable(ax,'BLOCKED: coordinate evidence incomplete\nRaw state exists; XYZ interpretation not approved')
         else:
             whole=np.concatenate([e['xyz'] for e in paths]);low=whole.min(0);high=whole.max(0);pad=np.maximum((high-low)*.05,.001)
             for e in display:
-                x=np.array(e['xyz']);ax3.plot(*x.T,lw=.8);axxy.plot(x[:,0],x[:,1],lw=.8);axxz.plot(x[:,0],x[:,2],lw=.8)
+                x=np.array(e['xyz']);ax3.plot(*x.T,lw=.8);axxy.plot(x[:,0],x[:,1],lw=.8);axxz.plot(x[:,0],x[:,2],lw=.8);axyz.plot(x[:,1],x[:,2],lw=.8)
             ax3.set(xlabel='X (m)',ylabel='Y (m)',zlabel='Z (m)',xlim=(low[0]-pad[0],high[0]+pad[0]),ylim=(low[1]-pad[1],high[1]+pad[1]),zlim=(low[2]-pad[2],high[2]+pad[2]))
             for ax,d in ((axxy,1),(axxz,2)):
                 ax.set(xlim=(low[0]-pad[0],high[0]+pad[0]),ylim=(low[d]-pad[d],high[d]+pad[d]),xlabel='X (m)',ylabel=('Y' if d==1 else 'Z')+' (m)');ax.set_aspect('equal',adjustable='box')
-        ax3.set_title(s+' — '+task.replace('_',' ')[:55],fontsize=7);axxy.set_title('XY projection');axxz.set_title('XZ projection')
+            axyz.set(xlim=(low[1]-pad[1],high[1]+pad[1]),ylim=(low[2]-pad[2],high[2]+pad[2]),xlabel='Y (m)',ylabel='Z (m)');axyz.set_aspect('equal',adjustable='box')
+        ax3.set_title(s+' — '+task.replace('_',' ')[:55],fontsize=7);axxy.set_title('XY projection');axxz.set_title('XZ projection');axyz.set_title('YZ projection')
     save(fig,'figure_2_eef_trajectories','Figure 2 — Measured EEF paths only; no integrated action commands')
     fig,axes=plt.subplots(3,5,figsize=(21,11))
     for row,s in enumerate(suites):
