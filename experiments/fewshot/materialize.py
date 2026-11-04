@@ -148,6 +148,8 @@ def materialize(suite, seed, shots, *, smoke=False):
         mode = 'pinned_original_rlds'
     else:
         if target_version.exists():
+            require((target_version / 'dataset_info.json').is_file(),
+                    f'Incomplete prior TFDS output; remove only this directory and retry: {target_version}')
             actual_builder = tfds.builder_from_directory(str(target_version))
             loader_root = root
             mode = 'materialized_subset'
@@ -156,6 +158,9 @@ def materialize(suite, seed, shots, *, smoke=False):
         found = set()
         class LiberoGoalNoNoops(tfds.core.GeneratorBasedBuilder, skip_registration=True):
             VERSION = tfds.core.Version(version)
+            # The server TFDS version resolves namespace-package `experiments`
+            # to MultiplexedPath, which has no `.parts`. Give it this real file.
+            code_path = Path(__file__)
             def _info(self):
                 return tfds.core.DatasetInfo(builder=self, features=builder.info.features,
                     description='Nested random complete LIBERO expert episodes from pinned RLDS')
@@ -183,7 +188,7 @@ def materialize(suite, seed, shots, *, smoke=False):
         if actual_builder is None:
             output_builder = klass(data_dir=str(root))
             require(output_builder.name == dataset_name, 'TFDS builder name does not match OFT config')
-            output_builder.download_and_prepare()
+            output_builder.download_and_prepare(download_dir=str(target / 'tfds_downloads'))
             actual_builder = tfds.builder_from_directory(str(target_version))
             loader_root = root
             mode = 'materialized_subset'
