@@ -8,6 +8,49 @@ from experiments.shot_scaling.core import digest
 
 
 class CleanupTests(unittest.TestCase):
+    def test_protected_cache_links_are_verified_but_never_allowed_in_targets(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t).resolve(); self.setup_tree(root)
+            cache=root/'data/hf-cache'; (cache/'blobs').mkdir(parents=True)
+            (cache/'snapshots/revision').mkdir(parents=True)
+            blob=cache/'blobs/weights'; blob.write_bytes(b'checkpoint')
+            link=cache/'snapshots/revision/model.pt'
+            link.symlink_to('../../blobs/weights')
+            with patch.object(cleanup,'process_check',return_value={'clear':True}):
+                p=cleanup.plan(root)
+                entry=p['protected'][str(root/'data')]['hf-cache/snapshots/revision/model.pt']
+                self.assertEqual(entry['type'],'symlink')
+                cleanup.archive(p,root/'archive')
+                cleanup.unchanged(p)
+                blob.write_bytes(b'changed')
+                with self.assertRaises(ValueError): cleanup.unchanged(p)
+                blob.write_bytes(b'checkpoint')
+                link.unlink(); link.symlink_to(root/'checkpoints/record')
+                with self.assertRaises(ValueError): cleanup.plan(root)
+                link.unlink(); link.symlink_to(cache/'blobs')
+                with self.assertRaises(ValueError): cleanup.plan(root)
+                link.unlink(); link.symlink_to(cache/'missing')
+                with self.assertRaises(FileNotFoundError): cleanup.plan(root)
+                link.unlink(); link.symlink_to('../../blobs/weights')
+                (root/'outputs/dataset_analysis/link').symlink_to(blob)
+                with self.assertRaises(ValueError): cleanup.plan(root)
+
+    def test_plan_output_is_complete_exclusive_and_absent_on_failure(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t).resolve(); self.setup_tree(root)
+            output=root/'outputs/review/plan.json'
+            with patch.object(cleanup,'plan',side_effect=ValueError('inventory failed')):
+                with self.assertRaises(ValueError): cleanup.save_plan(root,output)
+            self.assertFalse(output.exists())
+            with patch.object(cleanup,'process_check',return_value={'clear':True}):
+                cleanup.save_plan(root,output)
+            from experiments.shot_scaling.core import read
+            self.assertEqual(read(output)['status'],'PROPOSAL_ONLY')
+            before=output.read_bytes()
+            with self.assertRaises(ValueError): cleanup.save_plan(root,output)
+            self.assertEqual(output.read_bytes(),before)
+            self.assertEqual(list(output.parent.glob('.cleanup-plan-*')),[])
+
     def setup_tree(self, root):
         for p in (*cleanup.GUARDS, *('outputs/'+t for t in cleanup.TARGETS)):
             (root/p).mkdir(parents=True, exist_ok=True)

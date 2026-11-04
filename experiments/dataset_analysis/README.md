@@ -21,18 +21,25 @@ must be inventoried on the host where cleanup will happen.
 
 ```bash
 mkdir -p outputs/stage1_review
-python -m experiments.dataset_analysis.cleanup plan-cleanup > outputs/stage1_review/cleanup_plan.json
+python -m experiments.dataset_analysis.cleanup plan-cleanup \
+  --output outputs/stage1_review/cleanup_plan.json &&
 python -m experiments.dataset_analysis.cleanup archive \
   --plan outputs/stage1_review/cleanup_plan.json \
-  --archive outputs/archives/stage1_before_cleanup
+  --archive outputs/archives/stage1_before_cleanup &&
 python -m experiments.dataset_analysis.cleanup verify \
   --archive outputs/archives/stage1_before_cleanup
 ```
 
-`plan-cleanup` only reads the repository and emits JSON. The shell redirection
-saves the proposal outside the four targets. Inventory includes every regular
+`plan-cleanup` inventories the repository without changing source artifacts. With
+`--output`, it atomically saves a complete proposal outside inventoried trees and
+refuses overwrite; an inventory failure leaves no empty output file. Without
+`--output`, it emits JSON on stdout. Inventory includes every regular
 file's size/hash and empty directories, plus checkpoint/data/vendor/runtime guards.
-Root/nested symlinks, special files and path escapes are rejected. The archive
+Deletion-target symlinks, protected directory symlinks, special files and path
+escapes are rejected. Protected file symlinks (such as HF snapshot-to-blob links)
+are accepted only when they resolve to a regular file inside the same protected
+tree. Their link text, resolved path, size and content hash are recorded and
+rechecked; external or dangling links remain blocked. The archive
 contains all four target trees, clearly marked reference-only. It is a verified
 copy, not immutable storage. Never remove or edit it.
 

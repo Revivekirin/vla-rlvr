@@ -1,10 +1,12 @@
 """Two-phase, exact-inventory cleanup. No source or checkpoint directory is deleted."""
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
 import stat
 import subprocess
+import tempfile
 from experiments.shot_scaling.core import ROOT, digest, read, require, sha, write
 
 TARGETS = ('dataset_analysis', 'research_dashboard', 'fewshot_sft', 'rlvr_analysis')
@@ -20,11 +22,21 @@ def safe(root, path):
     return path
 
 
-def inventory(root, path):
+def inventory(root, path, *, protected=False):
     path = safe(root, path)
     require(path.is_dir(), f'Missing directory: {path}')
     result = {}
     for p in sorted(path.rglob('*')):
+        if protected and p.is_symlink():
+            safe(root, p.parent)
+            link = os.readlink(p)
+            target = p.resolve(strict=True)
+            require(target.is_relative_to(path), f'Protected link escapes its tree: {p} -> {target}')
+            safe(root, target)
+            require(target.is_file(), f'Protected link must resolve to a regular file: {p}')
+            result[str(p.relative_to(path))] = dict(type='symlink', link=link,
+                resolved=str(target), bytes=target.stat().st_size, sha256=sha(target))
+            continue
         safe(root, p)
         mode = p.lstat().st_mode
         require(stat.S_ISREG(mode) or stat.S_ISDIR(mode), f'Special file: {p}')
@@ -58,7 +70,7 @@ def plan(root):
     root = Path(root).resolve()
     targets = {str(root/'outputs'/t): inventory(root, root/'outputs'/t)
                for t in TARGETS if (root/'outputs'/t).exists()}
-    guards = {str(root/g): inventory(root, root/g) for g in GUARDS}
+    guards = {str(root/g): inventory(root, root/g, protected=True) for g in GUARDS}
     return dict(schema=1, root=str(root), targets=targets, protected=guards,
                 processes=process_check(root), deletion_set_sha256=digest(targets),
                 status='PROPOSAL_ONLY', source_code_deleted=False)
@@ -70,7 +82,30 @@ def unchanged(p):
     require(set(p['targets']) <= {str(root/'outputs'/t) for t in TARGETS}, 'Unexpected target')
     require(set(p['protected']) == {str(root/g) for g in GUARDS}, 'Missing guards')
     for path, expected in {**p['targets'], **p['protected']}.items():
-        require(inventory(root, path) == expected, f'Changed since proposal: {path}')
+        require(inventory(root, path, protected=path in p['protected']) == expected,
+                f'Changed since proposal: {path}')
+
+
+def save_plan(root, destination):
+    """Publish a complete proposal atomically, without overwriting an earlier one."""
+    root = Path(root).resolve()
+    destination = safe(root, destination)
+    require(not any(destination.is_relative_to(root/p) for p in
+                    (*GUARDS, *('outputs/'+t for t in TARGETS))), 'Plan must be outside inventoried trees')
+    require(not destination.exists(), f'Plan already exists: {destination}')
+    payload = json.dumps(plan(root), indent=2, sort_keys=True) + '\n'
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=destination.parent,
+                                         prefix='.cleanup-plan-', delete=False) as f:
+            temporary = Path(f.name)
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        os.link(temporary, destination)  # Atomic publication; fails if destination appeared.
+    finally:
+        if temporary is not None: temporary.unlink()
 
 
 def archive(p, destination):
@@ -123,10 +158,13 @@ def main():
     parser.add_argument('--plan', type=Path)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--approved-plan-sha256')
+    parser.add_argument('--output', type=Path, help='Atomically save plan-cleanup JSON; refuses overwrite')
     a = parser.parse_args()
     if a.command == 'plan-cleanup':
-        import json
-        print(json.dumps(plan(ROOT), indent=2, sort_keys=True))
+        if a.output:
+            save_plan(ROOT, a.output)
+            print(a.output.resolve())
+        else: print(json.dumps(plan(ROOT), indent=2, sort_keys=True))
     elif a.command == 'verify':
         verify(a.archive); print(sha(a.archive/'archive_manifest.json'))
     elif a.command == 'archive': print(archive(read(a.plan), a.archive))
