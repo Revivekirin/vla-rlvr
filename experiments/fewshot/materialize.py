@@ -186,7 +186,9 @@ def materialize(suite, seed, shots, *, smoke=False):
         class LiberoSpatialNoNoops(LiberoGoalNoNoops, skip_registration=True):
             pass
         class Libero10NoNoops(LiberoGoalNoNoops, skip_registration=True):
-            pass
+            # TFDS infers ``libero10_no_noops`` from this Python class name;
+            # the official OFT dataset key has an underscore before 10.
+            name = 'libero_10_no_noops'
         klass = {'goal': LiberoGoalNoNoops, 'spatial': LiberoSpatialNoNoops,
                  'long': Libero10NoNoops}[suite]
         if actual_builder is None:
