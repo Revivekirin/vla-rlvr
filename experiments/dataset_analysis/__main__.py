@@ -131,9 +131,13 @@ def main():
     lo.add_argument('--protected',type=Path,nargs='+',default=[ROOT/'outputs/fewshot_sft',ROOT/'checkpoints'])
     au=sub.add_parser('audit');au.add_argument('--source',type=Path,required=True);au.add_argument('--suite',choices=tuple(SUITES),required=True)
     au.add_argument('--source-revision',required=True);au.add_argument('--convention',type=Path);au.add_argument('--max-episodes',type=int);au.add_argument('--output',type=Path,required=True)
-    bu=sub.add_parser('build');bu.add_argument('--audit',type=Path,nargs='+',required=True);bu.add_argument('--archive',type=Path,required=True)
+    bu=sub.add_parser('legacy-build',help='Historical mixed-stage builder; not Stage 1');bu.add_argument('--audit',type=Path,nargs='+',required=True);bu.add_argument('--archive',type=Path,required=True)
     bu.add_argument('--historical',type=Path,required=True);bu.add_argument('--selection-seeds',type=int,nargs='+',default=[42]);bu.add_argument('--display-seed',type=int,default=42)
     bu.add_argument('--output',type=Path,default=ROOT/'outputs/dataset_analysis/libero_expert_trajectories')
+    sb=sub.add_parser('build',help='Stage 1 only, no shot selections or policy analysis')
+    sb.add_argument('--audit',type=Path,nargs=3,required=True)
+    sb.add_argument('--convention',type=Path,nargs='*',default=[])
+    sb.add_argument('--output',type=Path,default=ROOT/'outputs/dataset_analysis')
     st=sub.add_parser('status');st.add_argument('--output',type=Path,default=ROOT/'outputs/dataset_analysis/libero_expert_trajectories')
     ma=sub.add_parser('materialize-check');ma.add_argument('--audit',type=Path,required=True);ma.add_argument('--selection',type=Path,required=True)
     a=p.parse_args()
@@ -142,7 +146,10 @@ def main():
     elif a.command=='audit':
         require(not a.output.exists(),'Audit output already exists')
         d=extract(a.source,a.suite,a.source_revision,a.convention,a.max_episodes);write(a.output,d);print(a.output.resolve())
-    elif a.command=='build':build(a)
+    elif a.command=='legacy-build':build(a)
+    elif a.command=='build':
+        from .stage1 import build as build_stage1
+        build_stage1(a.audit,a.output,a.convention)
     elif a.command=='status':return status(a.output)
     else:
         from experiments.shot_scaling.data import validate_selection
