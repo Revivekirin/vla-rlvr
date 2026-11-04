@@ -91,3 +91,22 @@ python -m unittest experiments.dataset_analysis.tests.test_descriptive \
 Fixtures test numerical behavior only. Real-data completion is recorded separately
 by the builder. No Stage 2–7 workflow is executed. Historical mixed-stage commands
 and documentation in LEGACY.md are not the current Stage 1 workflow.
+
+## Requested task-level supplements
+
+Generate 30 task PNGs in the existing figures directory, plus a linked index and
+CSV. This command uses saved analysis.json only and overwrites its own derived
+outputs without backups. It is opt-in, not part of the four main figures.
+
+```bash
+python -m experiments.dataset_analysis.task_plots \
+  --input outputs/dataset_analysis/analysis.json \
+  --output outputs/dataset_analysis/figures
+```
+
+Each task shows all its expert 3D/XY/XZ paths, task-local initial XY/XZ zooms,
+and world-frame versus initial-position-subtracted RMS spread along 32 normalized
+step positions. The latter removes initial translation only; it is not a causal
+explanation of variation. Per-task initial EEF positions do not capture full
+object/environment state. Task names, episode IDs and pairwise summary metrics
+are retained in task_trajectory_initial_manifest.json and the CSV/index.
