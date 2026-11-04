@@ -26,14 +26,15 @@ def path_statistics(x):
         net_displacement=float(np.linalg.norm(x[-1]-x[0])))
 
 
-def analyze(audit,seeds=(42,),historical=None):
+def analyze(audit,seeds=(42,),historical=None, *, documented=False):
     require(audit['status']=='AUDITED' and not audit.get('synthetic'),'A complete real source audit is required')
     require(audit['episodes_sha256']==digest(audit['episodes']),'Audit episode checksum mismatch')
     no_leakage(audit['episodes'])
     inventory=train_inventory(audit)
     selections={str(seed):{str(k):select(inventory,audit['suite'],k,seed) for k in (1,2,5,10,20,'Full')} for seed in seeds}
     historical_ids=validate_selection(historical,inventory) if historical is not None else None
-    physical=audit['physical_convention']['status']=='REVIEWED'
+    physical=documented or audit['physical_convention']['status']=='REVIEWED'
+    physical_label='SOURCE_DOCUMENTED' if documented else 'REVIEWED_CONVENTION'
     es=[]
     for r in audit['episodes']:
         a=np.asarray(r['actions']);s=np.asarray(r['observation_state']) if r['observation_state'] is not None else None
@@ -45,7 +46,7 @@ def analyze(audit,seeds=(42,),historical=None):
             xyz=s[:,:3].tolist() if valid else None,orientation=s[:,3:6].tolist() if valid else None,
             initial_proprio=s[0].tolist() if s is not None else None,
             physical=path_statistics(s[:,:3]) if valid else None,
-            physical_status='REVIEWED_CONVENTION' if valid else 'UNAVAILABLE',
+            physical_status=physical_label if valid else 'UNAVAILABLE',
             gripper_command=a[:,6].tolist(),gripper_events=[dict(step=int(j),command='high' if closed[j] else 'low') for j in events],
             gripper_event_definition='Crossing raw command threshold 0.5; opening/closing polarity is not independently verified',
             gripper_state=s[:,6:].tolist() if s is not None else None,
@@ -63,16 +64,18 @@ def analyze(audit,seeds=(42,),historical=None):
         es.append(e)
     tasks={};pairs=[]
     # Scientific question: within the same task, how much do measured positions differ at comparable progress?
-    # Temporal normalization is not DTW or policy diversity; use at most 64 deterministic episodes/task/split.
+    # Normalized index progress is not DTW or policy diversity. Descriptive mode uses all episodes; legacy mode caps at 64.
     for split in audit['declared_splits']:
         tasks[split]={}
         for task in sorted({e['task'] for e in es if e['split']==split}):
             rows=[e for e in es if e['task']==task and e['split']==split]
             paths=[e for e in rows if e['xyz'] is not None]
-            sampled=sorted(paths,key=lambda e:digest(['physical-pairs-v1',e['episode_id']]))[:64]
+            sampled=sorted(paths,key=lambda e:digest(['physical-pairs-v1',e['episode_id']]))
+            if not documented: sampled=sampled[:64]
+            aligned={e['episode_id']:align_path(e['xyz']) for e in sampled}
             for j,left in enumerate(sampled):
                 for right in sampled[j+1:]:
-                    rms=float(np.sqrt(np.mean(np.sum((align_path(left['xyz'])-align_path(right['xyz']))**2,axis=1))))
+                    rms=float(np.sqrt(np.mean(np.sum((aligned[left['episode_id']]-aligned[right['episode_id']])**2,axis=1))))
                     pairs.append(dict(suite=audit['suite'],split=split,task=task,episode_a=left['episode_id'],episode_b=right['episode_id'],
                         aligned_xyz_rms_m=rms,path_length_difference_m=abs(left['physical']['path_length']-right['physical']['path_length']),
                         endpoint_distance_m=float(np.linalg.norm(np.array(left['xyz'][-1])-right['xyz'][-1]))))
@@ -83,12 +86,12 @@ def analyze(audit,seeds=(42,),historical=None):
                 transition_weighted_action=dict(mean=allraw.mean(0).tolist(),std=allraw.std(0).tolist()),
                 episode_weighted_action=dict(mean=mean.tolist(),std=np.sqrt(np.maximum(np.mean([(x*x).mean(0) for x in raw],axis=0)-mean*mean,0)).tolist()),
                 physical_path_episodes=len(paths),pairwise_sample_ids=[e['episode_id'] for e in sampled],
-                physical_path_status='REVIEWED_CONVENTION' if len(paths)==len(rows) else 'UNAVAILABLE_OR_PARTIAL')
+                physical_path_status=physical_label if len(paths)==len(rows) else 'UNAVAILABLE_OR_PARTIAL')
     return dict(schema=1,suite=audit['suite'],status='DESCRIPTIVE_ANALYSIS',synthetic=False,source=audit['source'],
         physical_convention=audit['physical_convention'],declared_splits=audit['declared_splits'],integrity=audit['integrity'],
         episodes=es,tasks=tasks,physical_pairs=pairs,selections=selections,
         historical_selection=historical,historical_ids=sorted(historical_ids) if historical_ids else None,
         historical_note='Historical Goal5 is separate from every newly selected nested condition',
         unavailable=['Object positions are not inferred from images or controller actions','No independent success verification from terminal alone'],
-        pairwise_question='Within-task differences in measured XYZ at normalized progress, using 32 samples and at most 64 source-ID-ranked episodes per task/split',
+        pairwise_question='Within-task differences in measured XYZ at normalized index progress, using 32 samples; '+('all episode pairs' if documented else 'at most 64 source-ID-ranked episodes')+' per task/split',
         endpoint_note='Last recorded observation, not an inferred post-final-action environment state')

@@ -135,6 +135,7 @@ def main():
     bu.add_argument('--historical',type=Path,required=True);bu.add_argument('--selection-seeds',type=int,nargs='+',default=[42]);bu.add_argument('--display-seed',type=int,default=42)
     bu.add_argument('--output',type=Path,default=ROOT/'outputs/dataset_analysis/libero_expert_trajectories')
     sb=sub.add_parser('build',help='Stage 1 only, no shot selections or policy analysis')
+    sb.add_argument('--refresh',action='store_true',help='Replace derived outputs using existing state sequences; no backup')
     sb.add_argument('--audit',type=Path,nargs=3,required=True)
     sb.add_argument('--convention',type=Path,nargs='*',default=[])
     sb.add_argument('--output',type=Path,default=ROOT/'outputs/dataset_analysis')
@@ -149,7 +150,7 @@ def main():
     elif a.command=='legacy-build':build(a)
     elif a.command=='build':
         from .stage1 import build as build_stage1
-        build_stage1(a.audit,a.output,a.convention)
+        build_stage1(a.audit,a.output,a.convention,a.refresh)
     elif a.command=='status':return status(a.output)
     else:
         from experiments.shot_scaling.data import validate_selection
