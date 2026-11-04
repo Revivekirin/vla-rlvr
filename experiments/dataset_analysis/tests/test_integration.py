@@ -50,9 +50,10 @@ class IntegrationTests(unittest.TestCase):
             with self.assertRaises(ValueError):validate_labels([bad])
 
     def test_real_source_evidence_is_bound_but_does_not_bypass_gate(self):
-        if not (ROOT/'outputs/dataset_analysis/audits/goal.json').exists():
-            self.skipTest('Real audit artifacts not available in this checkout')
-        audits={s:read(ROOT/f'outputs/dataset_analysis/audits/{s}.json') for s in ('goal','spatial','long')}
+        paths={s:ROOT/f'outputs/dataset_analysis/audits/{s}.json' for s in ('goal','spatial','long')}
+        missing=[str(p) for p in paths.values() if not p.is_file()]
+        if missing:self.skipTest('Real audit artifacts unavailable: '+', '.join(missing))
+        audits={s:read(p) for s,p in paths.items()}
         ev=evidence(audits)
         self.assertEqual(ev['status'],'BLOCKED');self.assertFalse(ev['physical_plots_allowed'])
         for source in ev['sources']:
@@ -64,21 +65,24 @@ class IntegrationTests(unittest.TestCase):
 
     def test_restore_rejects_blocked_evidence_without_output(self):
         from experiments.dataset_analysis.restore import restore
-        if not (ROOT/'outputs/dataset_analysis/audits/goal.json').exists():
-            self.skipTest('Real audit artifacts not available in this checkout')
         audits=[ROOT/f'outputs/dataset_analysis/audits/{s}.json' for s in ('goal','spatial','long')]
+        bundle=ROOT/'outputs/dataset_analysis/libero_expert_trajectories/analysis.json'
+        missing=[str(p) for p in [*audits,bundle] if not p.is_file()]
+        if missing:self.skipTest('Legacy restore artifacts unavailable: '+', '.join(missing))
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/'blocked.json';p.write_text('{"status":"BLOCKED"}')
             output=Path(t)/'restore'
             with self.assertRaises(ValueError):
-                restore(audits,[p,p,p],ROOT/'outputs/dataset_analysis/libero_expert_trajectories/analysis.json',output)
+                restore(audits,[p,p,p],bundle,output)
             self.assertFalse(output.exists())
 
     def test_saved_result_counts_are_not_mixed_across_conditions(self):
         from experiments.dataset_analysis.integration import dashboard_data
         b=ROOT/'outputs/dataset_analysis/libero_expert_trajectories/analysis.json'
-        if not b.exists():self.skipTest('Real result artifacts unavailable')
-        d=dashboard_data(read(b),read(ROOT/'outputs/rlvr_analysis/research_summary_all.json'))
+        summary=ROOT/'outputs/rlvr_analysis/research_summary_all.json'
+        missing=[str(p) for p in (b,summary) if not p.is_file()]
+        if missing:self.skipTest('Optional legacy dashboard artifacts unavailable (not required for Stage 1): '+', '.join(missing))
+        d=dashboard_data(read(b),read(summary))
         expected={'nominal':{'sft':(486,500),'scale':(488,500),'ript':(488,500)},
                   'ood':{'sft':(1675,2591),'scale':(1667,2591),'ript':(1620,2591)}}
         for condition,models in expected.items():
