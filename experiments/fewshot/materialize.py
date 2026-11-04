@@ -87,7 +87,11 @@ def check_train_loader(root, dataset_name, expected, *, use_cache):
         ds = RLDSDataset(Path(root), dataset_name, lambda sample: sample,
                          resize_resolution=(64, 64), shuffle_buffer_size=1,
                          train=True, image_aug=False)
-        require(int(ds.dataset_statistics['num_trajectories']) == expected['num_trajectories'],
+        # make_interleaved_dataset returns statistics keyed by dataset name,
+        # even for a single-dataset LIBERO mixture.
+        require(set(ds.dataset_statistics) == {dataset_name}, 'Unexpected OFT dataset mixture')
+        loader_stats = ds.dataset_statistics[dataset_name]
+        require(int(loader_stats['num_trajectories']) == expected['num_trajectories'],
                 'OFT loader normalization episode count mismatch')
         sample = next(iter(ds))
         require(np.asarray(sample['action']).shape[-2:] == (8, 7), 'OFT action chunk must be 8 x 7')
@@ -98,7 +102,7 @@ def check_train_loader(root, dataset_name, expected, *, use_cache):
                 'Official unnormalized gripper channel changed')
         for key in ('action', 'proprio'):
             for field in ('mean', 'std', 'min', 'max', 'q01', 'q99'):
-                require(np.allclose(ds.dataset_statistics[key][field], expected[key][field], rtol=1e-5, atol=1e-6),
+                require(np.allclose(loader_stats[key][field], expected[key][field], rtol=1e-5, atol=1e-6),
                         f'OFT loader used different {key}/{field} normalization data')
         actions = tf.reshape(tf.range(63, dtype=tf.float32), (9, 7))
         fixture = dict(action=actions,
