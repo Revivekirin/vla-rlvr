@@ -52,6 +52,6 @@ batch 64 and learning rate 5e-6 in Section 4.1 describe RL, not this SFT run.
 For a fixed batch-one 52000-step schedule, Goal Full (52042 transitions) gets
 approximately one dataset-sized volume of frame draws, while 1-shot seed 42
 (1265 transitions) gets about 41.1 such volumes. These are not unique-frame
-coverage or guaranteed success. Choose lower-shot budgets only after the Full
-run has passed checkpoint export and bounded nominal evaluation. No lower-shot
-training is launched automatically.
+coverage or guaranteed success. The 2026-11-05 Goal 20-shot pilot was started
+first to allow same-day bounded nominal evaluation; its recorded configuration
+is in `GOAL_20SHOT_RUN_2026-11-05.md`. No other condition is launched automatically.
