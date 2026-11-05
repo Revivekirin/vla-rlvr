@@ -68,3 +68,10 @@ runs, exports and evaluation under that directory. Keep the same value for
 training, export and evaluation commands. This leaves the Stage 2 RLDS and any
 old checkpoint at their original paths; `--resume` may read an old checkpoint
 from the repository while the new run writes elsewhere.
+
+The first 2026-11-05 resume attempt exposed a PyTorch 2.2 serialization
+compatibility issue: its weights-only loader cannot read the old
+`MultiStepLR.milestones` `collections.Counter`. The worker now checks the
+checkpoint hash first and permits a compatibility load only for that known
+legacy error. New optimizer checkpoints serialize the milestones as a plain
+dictionary, so their optimizer state remains weights-only loadable.

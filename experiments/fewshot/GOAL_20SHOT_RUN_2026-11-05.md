@@ -114,6 +114,8 @@ python -m experiments.fewshot.train \
 
 서버의 `/home`은 같은 시점에 686 GiB 여유가 확인되었다. 기존 RLDS와 6,000-step checkpoint는 `/nfs4`에 그대로 두고, 후속 실행의 새 로그·checkpoint·export·evaluation만 `/home/jhkim/vla-rlvr-stage3-sft`에 기록할 수 있다. 이를 위해 모든 후속 명령에서 `FEWSHOT_SFT_OUTPUT_ROOT=/home/jhkim/vla-rlvr-stage3-sft`를 동일하게 설정한다. 이 환경 변수는 Stage 2 데이터의 위치를 바꾸지 않는다. 실제 재개 명령과 결과는 실행 후 기록한다.
 
+첫 재개 시도는 2026-11-05 17:38 KST에 optimizer update 전에 중단되었다. PyTorch 2.2의 `weights_only=True` 로더가 기존 `optimizer.pt` 안의 `MultiStepLR.milestones` 자료형 `collections.Counter`를 지원하지 않았기 때문이다. 모델·action head·proprio projector 파일은 읽혔으나 optimizer 복원은 완료되지 않았다. 이후 코드는 파일 해시와 checkpoint identity를 먼저 확인한 뒤 이 **기존 자체 생성 파일의 알려진 Counter 오류**에만 호환 로딩을 허용하고, 새 checkpoint의 scheduler milestone은 일반 `dict`로 저장하도록 수정했다. 재개 성공 여부는 아직 확인되지 않았다.
+
 ## 학습·체크포인트 검증 기록
 
 | 검증 항목 | 현재 기록 / 완료 후 확인 위치 |

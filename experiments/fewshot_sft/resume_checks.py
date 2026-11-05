@@ -1,7 +1,37 @@
 """Fail-closed tensor/state checks, shared by training and export."""
+from collections import Counter
 from pathlib import Path
+import pickle
 
 from .common import NAME, inventory, read, require, sha
+
+
+def portable_scheduler_state(scheduler):
+    """Avoid pickling MultiStepLR's Counter in new optimizer checkpoints."""
+    state = scheduler.state_dict()
+    require(type(state.get('milestones')) is Counter, 'Unexpected LR scheduler milestones')
+    return dict(state, milestones=dict(state['milestones']))
+
+
+def load_optimizer_checkpoint(path, expected_sha256):
+    """Read our verified legacy Counter checkpoint on PyTorch 2.2, otherwise stay weights-only."""
+    import torch
+    path = Path(path)
+    require(path.name == 'optimizer.pt' and sha(path) == expected_sha256,
+            'Optimizer checkpoint identity changed')
+    try:
+        return torch.load(path, map_location='cpu', weights_only=True)
+    except pickle.UnpicklingError as exc:
+        require('Unsupported class collections.Counter' in str(exc),
+                f'Unexpected optimizer serialization error: {exc}')
+        safe_globals = getattr(getattr(torch, 'serialization', None), 'safe_globals', None)
+        if safe_globals is not None:
+            with safe_globals([Counter]):
+                return torch.load(path, map_location='cpu', weights_only=True)
+        # PyTorch 2.2 has no safe-globals allowlist. This one legacy checkpoint was
+        # produced by this pipeline and its complete file inventory was verified
+        # before loading; only its known MultiStepLR Counter gets this fallback.
+        return torch.load(path, map_location='cpu', weights_only=False)
 
 
 def equal_state(actual, expected, label):
@@ -48,13 +78,17 @@ def restore_optimizer(optimizer, scheduler, saved, step, names):
                 if key in state:
                     require(tuple(state[key].shape) == tuple(param.shape), f'Optimizer {key} shape mismatch')
                     require(bool(torch.isfinite(state[key]).all()), f'Nonfinite optimizer {key}')
-    require(saved['scheduler']['last_epoch'] == step, 'Scheduler cumulative step differs from checkpoint')
+    scheduler_state = dict(saved['scheduler'])
+    require(isinstance(scheduler_state.get('milestones'), dict),
+            'Unexpected saved LR scheduler milestones')
+    scheduler_state['milestones'] = Counter(scheduler_state['milestones'])
+    require(scheduler_state['last_epoch'] == step, 'Scheduler cumulative step differs from checkpoint')
     state_steps = [int(s['step']) for s in saved['optimizer']['state'].values() if 'step' in s]
     require(state_steps and max(state_steps) == step and min(state_steps) > 0, 'Adam state step mismatch')
     optimizer.load_state_dict(saved['optimizer'])
-    scheduler.load_state_dict(saved['scheduler'])
+    scheduler.load_state_dict(scheduler_state)
     equal_state(optimizer.state_dict(), saved['optimizer'], 'restored optimizer')
-    equal_state(scheduler.state_dict(), saved['scheduler'], 'restored scheduler')
+    equal_state(scheduler.state_dict(), scheduler_state, 'restored scheduler')
     require([g['lr'] for g in optimizer.param_groups] == scheduler.get_last_lr(), 'Restored optimizer/scheduler LR mismatch')
     return dict(optimizer_exact=True, scheduler_exact=True, scheduler_step=step,
                 lr=scheduler.get_last_lr(), adam_step_min=min(state_steps), adam_step_max=max(state_steps),

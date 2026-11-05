@@ -66,7 +66,8 @@ def main():
     state = {'actual_optimizer_steps': 0}
     started = time.monotonic()
     from .diagnostics import Diagnostics, install_metadata
-    from .resume_checks import optimizer_names, restore_optimizer, verify_components, verify_normalization
+    from .resume_checks import (load_optimizer_checkpoint, optimizer_names, portable_scheduler_state,
+                                restore_optimizer, verify_components, verify_normalization)
     diagnostics = Diagnostics(c, module.run_forward_pass)
     install_metadata(module)
     module.run_forward_pass = diagnostics.train_forward
@@ -101,7 +102,8 @@ def main():
             require(inventory(c['resume']) == c['resume_files'], 'Resume checkpoint changed after launch')
             verify_normalization(c['resume'], c['dataset'])
             components = verify_components(c['resume'], context['vla'], context['action_head'], context['proprio_projector'])
-            saved = torch.load(Path(c['resume'])/'optimizer.pt', map_location='cpu', weights_only=True)
+            optimizer_path = Path(c['resume'])/'optimizer.pt'
+            saved = load_optimizer_checkpoint(optimizer_path, c['resume_files']['optimizer.pt']['sha256'])
             proof = restore_optimizer(optimizer, scheduler, saved, c['resume_step'], state['parameter_names'])
             write(run/'resume_verification.json', dict(status='passed', before_any_optimizer_update=True,
                 step=c['resume_step'], components=components, **proof, continuity=c['continuity']))
@@ -140,7 +142,7 @@ def main():
         save(**kw)
         folder = Path(str(run)+f'--{kw["log_step"]}_chkpt')
         torch.save({'optimizer': state['optimizer'].state_dict(),
-                    'scheduler': state['scheduler'].state_dict(),
+                    'scheduler': portable_scheduler_state(state['scheduler']),
                     'parameter_names':state['parameter_names']}, folder/'optimizer.pt')
         metadata = dict(c, step=kw['log_step'], cumulative_optimizer_steps=kw['log_step'],
                         actual_optimizer_steps=state['actual_optimizer_steps'], merged=False)
