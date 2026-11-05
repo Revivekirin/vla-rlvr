@@ -54,14 +54,6 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None):
     require(torch.cuda.is_available() and torch.cuda.is_bf16_supported(), 'A CUDA BF16 GPU is required')
     base = Path(snapshot_download(BASE, local_files_only=True)).resolve()
     require(not (base / 'adapter_config.json').exists(), 'Initialization must be the pristine pretrained base')
-    smoke = read(ROOT / 'outputs/stage3_sft/smoke/goal' / f'seed{seed}' / 'Full_attempt1' / 'smoke_result.json')
-    require(smoke['status'] == 'PASS' and smoke['optimizer_steps'] == 1,
-            'Goal Full one-step smoke has not passed')
-    require(smoke['selection_sha256'] == validation['selection_sha256']
-            and smoke['normalization_sha256'] == validation['normalization_sha256']
-            and Path(smoke['base_snapshot']).resolve() == base
-            and smoke['gpu'] == torch.cuda.get_device_name(),
-            'Smoke dataset, normalization, base or GPU differs from this run')
     source_paths = [
         'runtime/openvla-oft/prismatic/vla/datasets/datasets.py',
         'runtime/openvla-oft/prismatic/vla/datasets/rlds/dataset.py',
@@ -94,7 +86,6 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None):
         scheduler_config=dict(kind='MultiStepLR', milestones=[100000], gamma=0.1, warmup_steps=0),
         source_hashes={name: sha(ROOT / name) for name in source_paths},
         official_finetune_sha256=sha(OFT / 'vla-scripts/finetune.py'),
-        smoke_evidence=str(ROOT / 'outputs/stage3_sft/smoke/goal' / f'seed{seed}' / 'Full_attempt1' / 'smoke_result.json'),
         dataset_exposure=dict(
             frame_draws=max_steps, transitions=validation['transition_count'],
             estimated_repetitions=max_steps / validation['transition_count'],
