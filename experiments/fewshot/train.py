@@ -1,4 +1,4 @@
-"""Run one Goal Full SFT condition from the verified Stage 2 RLDS."""
+"""Run one independent Goal SFT condition from the verified Stage 2 RLDS."""
 import argparse
 import json
 import math
@@ -16,15 +16,26 @@ from experiments.fewshot_sft.checkpoint import check
 
 MILESTONES = (200, 500, 1000, 3000, 6000, 12000, 24000, 52000)
 RUN_BOUNDS = (1000, 3000, 6000, 12000, 24000, 52000)
-GLOBAL64_BOUNDS = (1000, 5000, 10000, 25000, 50000)
 GLOBAL64_MILESTONES = (1000, 5000, 10000, 25000, 50000)
-PILOT_BOUNDS = (6000, 12000, 24000, 52000)
 PILOT_MILESTONES = (1000, 6000, 12000, 24000, 52000)
 ARCHITECTURE = dict(
     use_l1_regression=True, use_diffusion=False, use_film=False,
     num_images_in_input=2, use_proprio=True, use_lora=True, lora_rank=32,
     action_chunk=8, action_dim=7, proprio_dim=8, image_aug=True,
 )
+SHOTS = (1, 2, 5, 10, 20, 'Full')
+
+
+def checkpoint_schedule(profile, max_steps, requested=None):
+    milestones = (GLOBAL64_MILESTONES if profile == 'single_gpu_global64' else
+                  PILOT_MILESTONES if profile == 'single_gpu_batch1_pilot' else MILESTONES)
+    if requested is None:
+        return sorted({step for step in milestones if step <= max_steps} | {max_steps})
+    require(bool(requested) and all(type(step) is int and 0 < step <= max_steps for step in requested),
+            'Checkpoint steps must be positive optimizer steps within max_steps')
+    require(len(requested) == len(set(requested)) and max_steps in requested,
+            'Checkpoint steps must be unique and include final max_steps')
+    return sorted(requested)
 
 
 def loss_trend(run, first_step, last_step, milestones):
@@ -44,14 +55,20 @@ def loss_trend(run, first_step, last_step, milestones):
 
 
 def configuration(suite, seed, shots, max_steps, run_id, resume=None,
-                  profile='legacy_batch1'):
-    require((suite, shots) == ('goal', 'Full'),
-            'Stage 3 currently opens only Goal Full; validate Full before enabling fewer shots')
+                  profile='legacy_batch1', checkpoint_steps=None, train_seed=7):
+    require(suite == 'goal' and shots in SHOTS, 'Stage 3 supports Goal 1/2/5/10/20/Full')
     require(profile in ('legacy_batch1', 'single_gpu_batch1_pilot', 'single_gpu_global64'),
             'Unknown training profile')
-    bounds = (RUN_BOUNDS if profile == 'legacy_batch1' else
-              PILOT_BOUNDS if profile == 'single_gpu_batch1_pilot' else GLOBAL64_BOUNDS)
-    require(seed >= 0 and max_steps in bounds, 'Invalid seed or training bound')
+    require(profile != 'legacy_batch1' or shots == 'Full',
+            'Legacy profile preserves the historical Goal Full run only')
+    require(type(seed) is int and seed >= 0 and type(train_seed) is int and train_seed >= 0,
+            'Invalid selection or training seed')
+    valid_bound = (max_steps in RUN_BOUNDS if profile == 'legacy_batch1' else
+                   max_steps <= 52000 if profile == 'single_gpu_batch1_pilot' else
+                   max_steps <= 50000)
+    require(type(max_steps) is int and max_steps > 0 and valid_bound,
+            'Invalid optimizer-step bound for this profile')
+    checkpoints = checkpoint_schedule(profile, max_steps, checkpoint_steps)
     if profile != 'legacy_batch1':
         require(resume is None, 'Revised-profile runs must start from the pretrained base')
     require(run_id and all(ch.isalnum() or ch in '-_' for ch in run_id), 'Unsafe run ID')
@@ -67,14 +84,16 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
     require(not (base / 'adapter_config.json').exists(), 'Initialization must be the pristine pretrained base')
     smoke_path = None
     if profile == 'single_gpu_global64':
+        shot_label = 'Full' if shots == 'Full' else f'{shots}shot'
         candidates = sorted((ROOT / 'outputs/stage3_sft/smoke/goal' / f'seed{seed}').glob(
-            'Full_batch1_accum64_attempt*/smoke_result.json'))
+            f'{shot_label}_batch1_accum64_attempt*/smoke_result.json'))
         for candidate in candidates:
             evidence = read(candidate)
             if (evidence.get('status') == 'PASS' and evidence.get('optimizer_steps') == 1
                     and evidence.get('microbatches') == 64
                     and evidence.get('effective_batch_size') == 64
-                    and evidence.get('train_seed') == 7
+                    and evidence.get('suite') == suite and evidence.get('shots') == shots
+                    and evidence.get('train_seed') == train_seed
                     and evidence.get('selection_sha256') == validation['selection_sha256']
                     and evidence.get('normalization_sha256') == validation['normalization_sha256']
                     and evidence.get('base_snapshot') == str(base)
@@ -96,6 +115,8 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         'experiments/fewshot/train_smoke.py',
         'experiments/fewshot/train.py',
     ]
+    effective_batch = 64 if profile == 'single_gpu_global64' else 1
+    transitions = validation['transition_count']
     config = dict(
         schema=2, stage='stage3_sft', base_identity=BASE, base_snapshot=str(base),
         base_revision=base.name, base_files=inventory(base),
@@ -107,15 +128,16 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         normalization_sha256=validation['normalization_sha256'],
         episode_count=validation['episode_count'],
         selected_transitions=validation['transition_count'],
-        output=str(output), train_seed=7, profile=profile,
+        output=str(output), train_seed=train_seed, profile=profile,
         accumulation_smoke=str(smoke_path) if smoke_path else None,
-        batch_size=1, gradient_accumulation=64 if profile == 'single_gpu_global64' else 1,
-        effective_batch_size=64 if profile == 'single_gpu_global64' else 1,
+        batch_size=1, gradient_accumulation=effective_batch,
+        effective_batch_size=effective_batch,
         world_size=1, learning_rate=5e-4,
         max_steps=max_steps, save_freq=max_steps,
-        checkpoint_steps=[step for step in (GLOBAL64_MILESTONES if profile == 'single_gpu_global64'
-                                            else PILOT_MILESTONES if profile == 'single_gpu_batch1_pilot'
-                                            else MILESTONES) if step <= max_steps],
+        checkpoint_steps=checkpoints,
+        checkpoint_exposure={str(step): dict(frame_draws=step * effective_batch,
+                                            nominal_dataset_passes=step * effective_batch / transitions)
+                             for step in checkpoints},
         validation=None, validation_freq=max_steps, loss_window=100,
         diagnostics_format='compact' if profile == 'single_gpu_global64' else 'full',
         resume=str(Path(resume).resolve()) if resume else None,
@@ -135,10 +157,9 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         source_hashes={name: sha(ROOT / name) for name in source_paths},
         official_finetune_sha256=sha(OFT / 'vla-scripts/finetune.py'),
         dataset_exposure=dict(
-            frame_draws=max_steps * (64 if profile == 'single_gpu_global64' else 1),
-            transitions=validation['transition_count'],
-            estimated_repetitions=max_steps * (64 if profile == 'single_gpu_global64' else 1)
-                                  / validation['transition_count'],
+            frame_draws=max_steps * effective_batch,
+            transitions=transitions,
+            estimated_repetitions=max_steps * effective_batch / transitions,
             note='Draws count loader samples; augmentation and shuffling change repeats.'),
     )
     if resume:
@@ -157,7 +178,7 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
                 'Resume must start from an earlier declared milestone')
         require((resume / 'optimizer.pt').is_file(), 'Resumable optimizer state is missing')
         config.update(resume_step=previous['step'], resume_files=inventory(resume),
-                      checkpoint_steps=[s for s in MILESTONES if previous['step'] < s <= max_steps],
+                      checkpoint_steps=[s for s in checkpoints if previous['step'] < s <= max_steps],
                       continuity=dict(start_step=previous['step'], tf_iterator_restored=False,
                                       rng_restored=False, bitwise_uninterrupted_equivalence=False,
                                       note='TF shuffle/prefetch restarts from the train seed.'),
@@ -175,24 +196,31 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=['goal'], required=True)
     parser.add_argument('--seed', type=int, required=True)
-    parser.add_argument('--shots', choices=['Full'], required=True)
-    parser.add_argument('--max-steps', type=int,
-                        choices=sorted(set(RUN_BOUNDS + GLOBAL64_BOUNDS + PILOT_BOUNDS)), required=True)
+    parser.add_argument('--train-seed', type=int, default=7)
+    parser.add_argument('--shots', choices=['Full', '20', '10', '5', '2', '1'], required=True)
+    parser.add_argument('--max-steps', type=int, required=True)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--profile', choices=['legacy_batch1', 'single_gpu_batch1_pilot',
                                               'single_gpu_global64'],
-                        default='legacy_batch1')
+                        help='Default: legacy_batch1 for Full, single_gpu_batch1_pilot for numeric shots')
     parser.add_argument('--resume', type=Path)
+    parser.add_argument('--checkpoint-steps', nargs='+', type=int,
+                        help='Explicit optimizer-step checkpoints; must include max-steps')
     parser.add_argument('--execute', action='store_true')
     args = parser.parse_args()
-    config = configuration(args.suite, args.seed, args.shots, args.max_steps,
-                           args.run_id, args.resume, args.profile)
+    shots = args.shots if args.shots == 'Full' else int(args.shots)
+    profile = args.profile or ('legacy_batch1' if shots == 'Full' else 'single_gpu_batch1_pilot')
+    config = configuration(args.suite, args.seed, shots, args.max_steps,
+                           args.run_id, args.resume, profile, args.checkpoint_steps,
+                           args.train_seed)
     command = [sys.executable, '-m', 'torch.distributed.run', '--standalone',
                '--nproc_per_node=1', '-m', 'experiments.fewshot_sft.worker',
                '--config', str(Path(config['output']) / 'training_config.json')]
     print(json.dumps({key: config[key] for key in ('output', 'dataset', 'rlds_root',
-          'base_snapshot', 'profile', 'effective_batch_size', 'max_steps',
-          'checkpoint_steps', 'dataset_exposure', 'official_reference')}, indent=2))
+          'base_snapshot', 'suite', 'shots', 'selection_seed', 'train_seed',
+          'profile', 'effective_batch_size', 'max_steps',
+          'checkpoint_steps', 'checkpoint_exposure', 'dataset_exposure',
+          'official_reference')}, indent=2))
     print(shlex.join(command))
     if not args.execute:
         return
@@ -213,7 +241,7 @@ def main():
     write(run / 'loss_trend.json', trend)
     for step in config['checkpoint_steps']:
         check(Path(str(run) + f'--{step}_chkpt'), merged=False)
-    print(f'PASS Goal Full to optimizer step {config["max_steps"]}: {run}')
+    print(f'PASS Goal {config["shots"]} to optimizer step {config["max_steps"]}: {run}')
 
 
 if __name__ == '__main__':

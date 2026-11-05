@@ -2,9 +2,12 @@
 import json
 from pathlib import Path
 import tempfile
+import sys
+import types
 import unittest
+from unittest import mock
 
-from experiments.fewshot.train import ARCHITECTURE, loss_trend
+from experiments.fewshot.train import ARCHITECTURE, checkpoint_schedule, configuration, loss_trend
 from experiments.fewshot_sft.checkpoint import check
 from experiments.fewshot_sft.common import inventory
 
@@ -52,6 +55,56 @@ class FullCheckpointTests(unittest.TestCase):
                 (checkpoint / f'{name}--1000_checkpoint.pt').write_bytes(b'fixture')
             (checkpoint / 'checkpoint_files.json').write_text(json.dumps(inventory(checkpoint)))
             self.assertEqual(check(checkpoint, merged=False)['episode_count'], 428)
+
+
+class ShotScheduleTests(unittest.TestCase):
+    def test_default_and_explicit_optimizer_step_checkpoints(self):
+        self.assertEqual(checkpoint_schedule('single_gpu_batch1_pilot', 52000),
+                         [1000, 6000, 12000, 24000, 52000])
+        self.assertEqual(checkpoint_schedule('single_gpu_batch1_pilot', 6344),
+                         [1000, 6000, 6344])
+        self.assertEqual(checkpoint_schedule('single_gpu_batch1_pilot', 6000, [6000, 1265, 3000]),
+                         [1265, 3000, 6000])
+        with self.assertRaisesRegex(ValueError, 'include final'):
+            checkpoint_schedule('single_gpu_batch1_pilot', 6000, [1265, 3000])
+        with self.assertRaisesRegex(ValueError, 'unique'):
+            checkpoint_schedule('single_gpu_batch1_pilot', 6000, [6000, 6000])
+        with self.assertRaisesRegex(ValueError, 'within max_steps'):
+            checkpoint_schedule('single_gpu_batch1_pilot', 6000, [6000, 12000])
+
+    def test_numeric_shot_uses_its_own_dataset_and_exposure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            base = root / 'base-revision'
+            base.mkdir()
+            dataset = root / 'goal-5shot'
+            validation = dict(rlds_root=str(dataset / 'rlds'), dataset_name='libero_goal_no_noops',
+                              source_revision='source', selection_sha256='selection',
+                              normalization_sha256='normalization', episode_count=50,
+                              transition_count=6344)
+            smoke = types.ModuleType('experiments.fewshot.train_smoke')
+            smoke.preflight = lambda suite, seed, shots: (dataset, validation, {})
+            hub = types.ModuleType('huggingface_hub')
+            hub.snapshot_download = lambda *_, **__: str(base)
+            torch = types.ModuleType('torch')
+            torch.cuda = types.SimpleNamespace(is_available=lambda: True,
+                                               is_bf16_supported=lambda: True)
+            with (mock.patch.dict(sys.modules, {'experiments.fewshot.train_smoke': smoke,
+                                                'huggingface_hub': hub, 'torch': torch}),
+                  mock.patch('experiments.fewshot.train.OUT', root),
+                  mock.patch('experiments.fewshot.train.destination', side_effect=lambda p: Path(p)),
+                  mock.patch('experiments.fewshot.train.inventory', return_value={}),
+                  mock.patch('experiments.fewshot.train.sha', return_value='sha')):
+                config = configuration('goal', 42, 5, 6344, 'goal-5shot-test',
+                                       profile='single_gpu_batch1_pilot',
+                                       checkpoint_steps=[1265, 3000, 6344])
+            self.assertEqual(config['shots'], 5)
+            self.assertEqual(config['dataset'], str(dataset))
+            self.assertEqual(config['episode_count'], 50)
+            self.assertEqual(config['selected_transitions'], 6344)
+            self.assertEqual(config['checkpoint_steps'], [1265, 3000, 6344])
+            self.assertEqual(config['checkpoint_exposure']['6344']['nominal_dataset_passes'], 1)
+            self.assertIsNone(config['resume'])
 
 
 if __name__ == '__main__':
