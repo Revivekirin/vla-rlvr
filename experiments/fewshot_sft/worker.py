@@ -6,7 +6,7 @@ import sys
 import time
 import types
 
-from .common import OFT, inventory, read, require, sha, write
+from .common import OFT, digest, inventory, read, require, sha, write
 
 
 def instrument(source):
@@ -56,7 +56,10 @@ def main():
     # Avoid upstream global statistics caches keyed only by DatasetInfo/transform.
     from prismatic.vla.datasets.rlds import dataset as rlds
     statistics = read(Path(c['dataset'])/'normalization.json')
-    require(statistics['num_trajectories'] == 10*c['shots'], 'Normalization episode count mismatch')
+    require(statistics['num_trajectories'] == c.get('episode_count', 10*c['shots'] if isinstance(c['shots'], int) else -1),
+            'Normalization episode count mismatch')
+    if c.get('stage') == 'stage3_sft':
+        require(digest(statistics) == c['normalization_sha256'], 'Stage 2 normalization changed after planning')
     import copy
     rlds.get_dataset_statistics = lambda *args, **kwargs: copy.deepcopy(statistics)
     run = Path(c['output'])
@@ -90,6 +93,10 @@ def main():
     def setup(optimizer, scheduler, context):
         state.update(optimizer=optimizer, scheduler=scheduler)
         state['parameter_names'] = optimizer_names(context)
+        if c.get('stage') == 'stage3_sft':
+            for prefix in ('vla.', 'action_head.', 'proprio_projector.'):
+                require(any(name.startswith(prefix) for name in state['parameter_names']),
+                        f'Missing trainable {prefix} parameters')
         if c['resume']:
             require(inventory(c['resume']) == c['resume_files'], 'Resume checkpoint changed after launch')
             verify_normalization(c['resume'], c['dataset'])
@@ -159,7 +166,8 @@ def main():
         with (run/'metrics.jsonl').open('a') as f:
             f.write(json.dumps({'step': step, 'prefix': prefix, 'metrics': values})+'\n')
     module.log_metrics_to_wandb = metrics
-    cfg = module.FinetuneConfig(vla_path=c['base_snapshot'], data_root_dir=Path(c['dataset'])/'rlds',
+    cfg = module.FinetuneConfig(vla_path=c['base_snapshot'],
+        data_root_dir=Path(c.get('rlds_root', str(Path(c['dataset'])/'rlds'))),
         dataset_name=c['dataset_name'], run_root_dir=run.parent, run_id_override=run.name,
         use_l1_regression=True, use_diffusion=False, use_film=False, num_images_in_input=2,
         use_proprio=True, use_lora=True, lora_rank=32, lora_dropout=0., image_aug=True,

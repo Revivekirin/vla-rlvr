@@ -1,0 +1,173 @@
+"""Run one bounded Goal Full SFT condition from the verified Stage 2 RLDS."""
+import argparse
+import json
+import math
+import os
+from pathlib import Path
+import shlex
+import subprocess
+import sys
+
+from experiments.fewshot_sft.common import (
+    BASE, OFT, OUT, ROOT, destination, inventory, read, require, sha, write,
+)
+from experiments.fewshot_sft.checkpoint import check
+from .train_smoke import preflight
+
+
+MILESTONES = (200, 500, 1000, 3000, 6000, 12000, 24000, 52000)
+RUN_BOUNDS = (1000, 3000, 6000, 12000, 24000, 52000)
+ARCHITECTURE = dict(
+    use_l1_regression=True, use_diffusion=False, use_film=False,
+    num_images_in_input=2, use_proprio=True, use_lora=True, lora_rank=32,
+    action_chunk=8, action_dim=7, proprio_dim=8, image_aug=True,
+)
+
+
+def loss_trend(run, first_step, last_step, milestones):
+    rows = [json.loads(line) for line in (run / 'diagnostics.jsonl').read_text().splitlines()]
+    require([row['step'] for row in rows] == list(range(first_step + 1, last_step + 1)),
+            'Missing or duplicate optimizer-step diagnostics')
+    losses = [row['normalized_chunk_l1'] for row in rows]
+    require(all(math.isfinite(loss) and loss >= 0 for loss in losses), 'Invalid training loss trend')
+    width = min(100, len(losses))
+    return dict(first_step=first_step, last_step=last_step,
+                first_window_mean=sum(losses[:width]) / width,
+                last_window_mean=sum(losses[-width:]) / width,
+                checkpoints={str(step): rows[step - first_step - 1]['moving_mean']
+                             for step in milestones},
+                final_task_frame_draws=rows[-1]['task_exposure'],
+                interpretation='Descriptive training loss; nominal rollout success is required to assess function.')
+
+
+def configuration(suite, seed, shots, max_steps, run_id, resume=None):
+    require((suite, shots) == ('goal', 'Full'),
+            'Stage 3 currently opens only Goal Full; validate Full before enabling fewer shots')
+    require(seed >= 0 and max_steps in RUN_BOUNDS, 'Invalid seed or training bound')
+    require(run_id and all(ch.isalnum() or ch in '-_' for ch in run_id), 'Unsafe run ID')
+    dataset, validation, stats = preflight(suite, seed, shots)
+    output = destination(OUT / 'runs' / run_id)
+    require(not output.exists() and not list(output.parent.glob(output.name + '--*')),
+            'Run ID or checkpoint prefix already exists')
+    from huggingface_hub import snapshot_download
+    import torch
+    require(torch.cuda.is_available() and torch.cuda.is_bf16_supported(), 'A CUDA BF16 GPU is required')
+    base = Path(snapshot_download(BASE, local_files_only=True)).resolve()
+    require(not (base / 'adapter_config.json').exists(), 'Initialization must be the pristine pretrained base')
+    smoke = read(ROOT / 'outputs/stage3_sft/smoke/goal' / f'seed{seed}' / 'Full_attempt1' / 'smoke_result.json')
+    require(smoke['status'] == 'PASS' and smoke['optimizer_steps'] == 1,
+            'Goal Full one-step smoke has not passed')
+    require(smoke['selection_sha256'] == validation['selection_sha256']
+            and smoke['normalization_sha256'] == validation['normalization_sha256']
+            and Path(smoke['base_snapshot']).resolve() == base
+            and smoke['gpu'] == torch.cuda.get_device_name(),
+            'Smoke dataset, normalization, base or GPU differs from this run')
+    source_paths = [
+        'runtime/openvla-oft/prismatic/vla/datasets/datasets.py',
+        'runtime/openvla-oft/prismatic/vla/datasets/rlds/dataset.py',
+        'runtime/openvla-oft/prismatic/vla/datasets/rlds/oxe/transforms.py',
+        'runtime/openvla-oft/prismatic/vla/constants.py',
+        'runtime/openvla-oft/prismatic/extern/hf/modeling_prismatic.py',
+        'experiments/fewshot_sft/worker.py',
+        'experiments/fewshot_sft/diagnostics.py',
+        'experiments/fewshot_sft/resume_checks.py',
+        'experiments/fewshot/train.py',
+    ]
+    config = dict(
+        schema=2, stage='stage3_sft', base_identity=BASE, base_snapshot=str(base),
+        base_revision=base.name, base_files=inventory(base),
+        dataset=str(dataset), rlds_root=validation['rlds_root'],
+        dataset_name=validation['dataset_name'], suite=suite, shots=shots,
+        selection_seed=seed, source_revision=validation['source_revision'],
+        selection_manifest_sha256=sha(dataset / 'selection_manifest.json'),
+        selection_sha256=validation['selection_sha256'],
+        normalization_sha256=validation['normalization_sha256'],
+        episode_count=validation['episode_count'],
+        selected_transitions=validation['transition_count'],
+        output=str(output), train_seed=7, batch_size=1, gradient_accumulation=1,
+        effective_batch_size=1, world_size=1, learning_rate=5e-4,
+        max_steps=max_steps, save_freq=max_steps,
+        checkpoint_steps=[step for step in MILESTONES if step <= max_steps],
+        validation=None, validation_freq=max_steps, loss_window=100,
+        resume=str(Path(resume).resolve()) if resume else None,
+        verify_resume=False, architecture=ARCHITECTURE, merged=False,
+        scheduler_config=dict(kind='MultiStepLR', milestones=[100000], gamma=0.1, warmup_steps=0),
+        source_hashes={name: sha(ROOT / name) for name in source_paths},
+        official_finetune_sha256=sha(OFT / 'vla-scripts/finetune.py'),
+        smoke_evidence=str(ROOT / 'outputs/stage3_sft/smoke/goal' / f'seed{seed}' / 'Full_attempt1' / 'smoke_result.json'),
+        dataset_exposure=dict(
+            frame_draws=max_steps, transitions=validation['transition_count'],
+            estimated_repetitions=max_steps / validation['transition_count'],
+            note='Draws count loader samples; augmentation and shuffling change repeats.'),
+    )
+    if resume:
+        resume = Path(resume).resolve()
+        previous = check(resume, merged=False)
+        from experiments.fewshot_sft.resume_checks import verify_normalization
+        verify_normalization(resume, dataset)
+        require(previous.get('stage') == 'stage3_sft' and previous['suite'] == suite
+                and previous['shots'] == shots and previous['selection_seed'] == seed,
+                'Resume checkpoint belongs to a different Stage 3 condition')
+        for field in ('base_revision', 'base_files', 'selection_sha256', 'normalization_sha256',
+                      'architecture', 'train_seed', 'batch_size', 'gradient_accumulation',
+                      'learning_rate', 'official_finetune_sha256'):
+            require(previous[field] == config[field], f'Resume changed {field}')
+        require(previous['step'] < max_steps and previous['step'] in MILESTONES,
+                'Resume must start from an earlier declared milestone')
+        require((resume / 'optimizer.pt').is_file(), 'Resumable optimizer state is missing')
+        config.update(resume_step=previous['step'], resume_files=inventory(resume),
+                      checkpoint_steps=[s for s in MILESTONES if previous['step'] < s <= max_steps],
+                      continuity=dict(start_step=previous['step'], tf_iterator_restored=False,
+                                      rng_restored=False, bitwise_uninterrupted_equivalence=False,
+                                      note='TF shuffle/prefetch restarts from the train seed.'),
+                      dataset_exposure=dict(frame_draws=max_steps - previous['step'],
+                                            transitions=validation['transition_count'],
+                                            estimated_repetitions=(max_steps - previous['step']) / validation['transition_count'],
+                                            prior_optimizer_steps=previous['step']))
+    else:
+        require(max_steps == 1000, 'Begin Goal Full with the 1000-step run')
+    return config
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--suite', choices=['goal'], required=True)
+    parser.add_argument('--seed', type=int, required=True)
+    parser.add_argument('--shots', choices=['Full'], required=True)
+    parser.add_argument('--max-steps', type=int, choices=RUN_BOUNDS, required=True)
+    parser.add_argument('--run-id', required=True)
+    parser.add_argument('--resume', type=Path)
+    parser.add_argument('--execute', action='store_true')
+    args = parser.parse_args()
+    config = configuration(args.suite, args.seed, args.shots, args.max_steps,
+                           args.run_id, args.resume)
+    command = [sys.executable, '-m', 'torch.distributed.run', '--standalone',
+               '--nproc_per_node=1', '-m', 'experiments.fewshot_sft.worker',
+               '--config', str(Path(config['output']) / 'training_config.json')]
+    print(json.dumps({key: config[key] for key in ('output', 'dataset', 'rlds_root',
+          'base_snapshot', 'max_steps', 'checkpoint_steps', 'dataset_exposure')}, indent=2))
+    print(shlex.join(command))
+    if not args.execute:
+        return
+    run = Path(config['output'])
+    run.mkdir(parents=True)
+    write(run / 'training_config.json', config)
+    env = dict(os.environ, HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
+               WANDB_MODE='disabled', PYTHONHASHSEED=str(config['train_seed']),
+               PYTHONPATH=os.pathsep.join([str(ROOT), str(OFT), os.environ.get('PYTHONPATH', '')]))
+    with (run / 'train.log').open('x') as log:
+        result = subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+    require(result.returncode == 0, f'Training failed; inspect {run / "train.log"}')
+    runtime = read(run / 'runtime.json')
+    require(runtime['status'] == 'passed' and runtime['actual_optimizer_steps'] ==
+            config['max_steps'] - config.get('resume_step', 0), 'Optimizer-step audit failed')
+    trend = loss_trend(run, config.get('resume_step', 0), config['max_steps'],
+                       config['checkpoint_steps'])
+    write(run / 'loss_trend.json', trend)
+    for step in config['checkpoint_steps']:
+        check(Path(str(run) + f'--{step}_chkpt'), merged=False)
+    print(f'PASS Goal Full to optimizer step {config["max_steps"]}: {run}')
+
+
+if __name__ == '__main__':
+    main()

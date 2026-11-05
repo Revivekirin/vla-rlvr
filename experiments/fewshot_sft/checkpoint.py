@@ -28,7 +28,8 @@ def check(path, merged=True):
         action_chunk=8, action_dim=7, proprio_dim=8, image_aug=True), 'Architecture mismatch')
     stats = read(path/'dataset_statistics.json')
     require(set(stats) == {NAME}, 'Unexpected normalization dataset keys')
-    require(stats[NAME]['num_trajectories'] == 10*m['shots'], 'Normalization trajectory count mismatch')
+    require(stats[NAME]['num_trajectories'] == m.get('episode_count', 10*m['shots'] if isinstance(m['shots'], int) else -1),
+            'Normalization trajectory count mismatch')
     require(stats[NAME]['num_transitions'] == m['selected_transitions'], 'Normalization transition count mismatch')
     for key, dim in [('action', 7), ('proprio', 8)]:
         for field in ('mean', 'std', 'min', 'max', 'q01', 'q99'):
