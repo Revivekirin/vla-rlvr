@@ -12,6 +12,8 @@ from .common import OFT, digest, inventory, read, require, sha, write
 def instrument(source):
     # Fix upstream zero-based stop/save bookkeeping, including accumulation boundaries.
     replacements = [
+        ('with tqdm.tqdm(total=cfg.max_steps, leave=False) as progress:',
+         'with tqdm.tqdm(total=cfg.max_steps, initial=cfg.resume_step if cfg.resume else 0, leave=False) as progress:'),
         ('gradient_step_idx = batch_idx // cfg.grad_accumulation_steps',
          'gradient_step_idx = (batch_idx + 1) // cfg.grad_accumulation_steps'),
         ('if gradient_step_idx > 0 and log_step % cfg.save_freq == 0:',

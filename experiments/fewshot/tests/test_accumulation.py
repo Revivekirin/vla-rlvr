@@ -21,6 +21,7 @@ class AccumulationTests(unittest.TestCase):
         self.assertTrue(found_scale, 'OFT no longer divides microbatch loss by accumulation steps')
         self.assertIn('(batch_idx + 1) % cfg.grad_accumulation_steps == 0', patched)
         self.assertIn('gradient_step_idx = (batch_idx + 1) // cfg.grad_accumulation_steps', patched)
+        self.assertIn('initial=cfg.resume_step if cfg.resume else 0', patched)
 
     @unittest.skipUnless(importlib.util.find_spec('torch'), 'PyTorch unavailable on this host')
     def test_four_microbatches_match_one_full_batch_update(self):
