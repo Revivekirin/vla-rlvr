@@ -18,6 +18,8 @@ MILESTONES = (200, 500, 1000, 3000, 6000, 12000, 24000, 52000)
 RUN_BOUNDS = (1000, 3000, 6000, 12000, 24000, 52000)
 GLOBAL64_BOUNDS = (1000, 5000, 10000, 25000, 50000)
 GLOBAL64_MILESTONES = (1000, 5000, 10000, 25000, 50000)
+PILOT_BOUNDS = (6000, 12000, 24000, 52000)
+PILOT_MILESTONES = (1000, 6000, 12000, 24000, 52000)
 ARCHITECTURE = dict(
     use_l1_regression=True, use_diffusion=False, use_film=False,
     num_images_in_input=2, use_proprio=True, use_lora=True, lora_rank=32,
@@ -45,11 +47,13 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
                   profile='legacy_batch1'):
     require((suite, shots) == ('goal', 'Full'),
             'Stage 3 currently opens only Goal Full; validate Full before enabling fewer shots')
-    require(profile in ('legacy_batch1', 'single_gpu_global64'), 'Unknown training profile')
-    bounds = RUN_BOUNDS if profile == 'legacy_batch1' else GLOBAL64_BOUNDS
+    require(profile in ('legacy_batch1', 'single_gpu_batch1_pilot', 'single_gpu_global64'),
+            'Unknown training profile')
+    bounds = (RUN_BOUNDS if profile == 'legacy_batch1' else
+              PILOT_BOUNDS if profile == 'single_gpu_batch1_pilot' else GLOBAL64_BOUNDS)
     require(seed >= 0 and max_steps in bounds, 'Invalid seed or training bound')
-    if profile == 'single_gpu_global64':
-        require(resume is None, 'Global-64 runs must start from the pretrained base')
+    if profile != 'legacy_batch1':
+        require(resume is None, 'Revised-profile runs must start from the pretrained base')
     require(run_id and all(ch.isalnum() or ch in '-_' for ch in run_id), 'Unsafe run ID')
     from .train_smoke import preflight
     dataset, validation, stats = preflight(suite, seed, shots)
@@ -110,6 +114,7 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         world_size=1, learning_rate=5e-4,
         max_steps=max_steps, save_freq=max_steps,
         checkpoint_steps=[step for step in (GLOBAL64_MILESTONES if profile == 'single_gpu_global64'
+                                            else PILOT_MILESTONES if profile == 'single_gpu_batch1_pilot'
                                             else MILESTONES) if step <= max_steps],
         validation=None, validation_freq=max_steps, loss_window=100,
         diagnostics_format='compact' if profile == 'single_gpu_global64' else 'full',
@@ -120,10 +125,13 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
                                 effective_batch=64, learning_rate=5e-4,
                                 maximum_steps=150005, goal_reported_best_step=50000,
                                 source=str(OFT / 'LIBERO.md'), source_sha256=sha(OFT / 'LIBERO.md')),
-        profile_interpretation=('Single-GPU accumulated global batch 64; same sample count per '
-                                'optimizer step as the official reference, not exact DDP reproduction.'
-                                if profile == 'single_gpu_global64' else
-                                'Low-cost batch-one infrastructure/early-training pilot.'),
+        profile_interpretation=(
+            'Single-GPU accumulated global batch 64; same sample count per optimizer step '
+            'as the official reference, not exact DDP reproduction.'
+            if profile == 'single_gpu_global64' else
+            'Fresh batch-one low-cost pilot; not an official global-64 reproduction.'
+            if profile == 'single_gpu_batch1_pilot' else
+            'Historical low-cost batch-one infrastructure/early-training reference.'),
         source_hashes={name: sha(ROOT / name) for name in source_paths},
         official_finetune_sha256=sha(OFT / 'vla-scripts/finetune.py'),
         dataset_exposure=dict(
@@ -168,9 +176,11 @@ def main():
     parser.add_argument('--suite', choices=['goal'], required=True)
     parser.add_argument('--seed', type=int, required=True)
     parser.add_argument('--shots', choices=['Full'], required=True)
-    parser.add_argument('--max-steps', type=int, choices=sorted(set(RUN_BOUNDS + GLOBAL64_BOUNDS)), required=True)
+    parser.add_argument('--max-steps', type=int,
+                        choices=sorted(set(RUN_BOUNDS + GLOBAL64_BOUNDS + PILOT_BOUNDS)), required=True)
     parser.add_argument('--run-id', required=True)
-    parser.add_argument('--profile', choices=['legacy_batch1', 'single_gpu_global64'],
+    parser.add_argument('--profile', choices=['legacy_batch1', 'single_gpu_batch1_pilot',
+                                              'single_gpu_global64'],
                         default='legacy_batch1')
     parser.add_argument('--resume', type=Path)
     parser.add_argument('--execute', action='store_true')
