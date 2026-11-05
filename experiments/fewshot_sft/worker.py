@@ -163,6 +163,11 @@ def main():
         write(folder/'checkpoint_files.json', inventory(folder))
     module.save_training_checkpoint = checkpoint
     def metrics(values, prefix, step, wandb):
+        if c.get('diagnostics_format') == 'compact':
+            # The final microbatch carries OFT's smoothed, full-accumulation metrics.
+            if step == 0 or step == state.get('last_metric_step'):
+                return
+            state['last_metric_step'] = step
         with (run/'metrics.jsonl').open('a') as f:
             f.write(json.dumps({'step': step, 'prefix': prefix, 'metrics': values})+'\n')
     module.log_metrics_to_wandb = metrics

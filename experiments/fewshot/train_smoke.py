@@ -9,6 +9,7 @@ import time
 import types
 
 from experiments.shot_scaling.core import ROOT, SUITES, digest, read, require, write
+from experiments.fewshot_sft.common import sha
 from .stage2 import selection_path
 
 OFT = ROOT / 'runtime/openvla-oft'
@@ -40,11 +41,16 @@ def preflight(suite, seed, shots):
     return path, validation, stats
 
 
-def smoke(suite, seed, shots, train_seed=7, attempt=1):
+def smoke(suite, seed, shots, train_seed=7, attempt=1, batch_size=1, gradient_accumulation=1):
     dataset, validation, stats = preflight(suite, seed, shots)
     require(type(train_seed) is int and train_seed >= 0, 'Invalid training seed')
     require(type(attempt) is int and attempt > 0, 'Attempt must be positive')
+    require(type(batch_size) is int and batch_size > 0, 'Batch size must be positive')
+    require(type(gradient_accumulation) is int and gradient_accumulation > 0,
+            'Gradient accumulation must be positive')
     name = 'Full' if shots == 'Full' else f'{shots}shot'
+    if (batch_size, gradient_accumulation) != (1, 1):
+        name += f'_batch{batch_size}_accum{gradient_accumulation}'
     output = RUNS / suite / f'seed{seed}' / f'{name}_attempt{attempt}'
     require(not output.exists(), f'Smoke output already exists: {output}')
     os.environ['HF_HUB_OFFLINE'] = '1'
@@ -79,13 +85,14 @@ def smoke(suite, seed, shots, train_seed=7, attempt=1):
     module.AutoModelForVision2Seq = types.SimpleNamespace(
         register=lambda *args, **kwargs: None,
         from_pretrained=module.OpenVLAForActionPrediction.from_pretrained)
-    state = {'optimizer_steps': 0, 'loss': None}
+    state = {'optimizer_steps': 0, 'microbatches': 0, 'loss': None}
     def setup(optimizer, scheduler, context):
         optimizer.register_step_post_hook(lambda *_: state.__setitem__('optimizer_steps', state['optimizer_steps'] + 1))
     def finite(loss, params):
         require(bool(torch.isfinite(loss).all()), 'Nonfinite SFT loss')
         grads = [p.grad for p in params if p.grad is not None]
         require(bool(grads) and all(bool(torch.isfinite(g).all()) for g in grads), 'Missing/nonfinite SFT gradients')
+        state['microbatches'] += 1
         state['loss'] = float(loss.detach().cpu())
     module._setup = setup
     module._finite = finite
@@ -100,7 +107,7 @@ def smoke(suite, seed, shots, train_seed=7, attempt=1):
         run_id_override=output.name, use_l1_regression=True, use_diffusion=False,
         use_film=False, num_images_in_input=2, use_proprio=True,
         use_lora=True, lora_rank=32, lora_dropout=0., image_aug=True,
-        batch_size=1, grad_accumulation_steps=1, learning_rate=5e-4,
+        batch_size=batch_size, grad_accumulation_steps=gradient_accumulation, learning_rate=5e-4,
         max_steps=1, save_freq=1, merge_lora_during_training=False,
         shuffle_buffer_size=1000, wandb_log_freq=1,
         wandb_entity=None, wandb_project='fewshot-stage3-smoke')
@@ -109,6 +116,8 @@ def smoke(suite, seed, shots, train_seed=7, attempt=1):
     try:
         module.finetune.__wrapped__(cfg)
         require(state['optimizer_steps'] == 1, 'Expected exactly one optimizer step')
+        require(state['microbatches'] == gradient_accumulation,
+                'Optimizer step did not consume the requested microbatches')
         status = 'PASS'
         error = None
     except Exception as exc:
@@ -122,7 +131,12 @@ def smoke(suite, seed, shots, train_seed=7, attempt=1):
             dataset=str(dataset), selection_sha256=validation['selection_sha256'],
             normalization_sha256=validation['normalization_sha256'],
             base_snapshot=str(base), train_seed=train_seed,
-            optimizer_steps=state['optimizer_steps'], loss=state['loss'],
+            batch_size=batch_size, gradient_accumulation=gradient_accumulation,
+            effective_batch_size=batch_size * gradient_accumulation,
+            optimizer_steps=state['optimizer_steps'], microbatches=state['microbatches'], loss=state['loss'],
+            official_finetune_sha256=sha(source),
+            worker_shim_sha256=sha(ROOT / 'experiments/fewshot_sft/worker.py'),
+            smoke_code_sha256=sha(ROOT / 'experiments/fewshot/train_smoke.py'),
             gpu=torch.cuda.get_device_name(),
             peak_reserved_bytes=torch.cuda.max_memory_reserved(),
             elapsed_seconds=time.monotonic() - started,
@@ -137,9 +151,11 @@ def main():
     p.add_argument('--shots', choices=['Full', '20', '10', '5', '2', '1'], required=True)
     p.add_argument('--train-seed', type=int, default=7)
     p.add_argument('--attempt', type=int, default=1)
+    p.add_argument('--batch-size', type=int, default=1)
+    p.add_argument('--gradient-accumulation', type=int, default=1)
     a = p.parse_args()
     result = smoke(a.suite, a.seed, a.shots if a.shots == 'Full' else int(a.shots),
-                   a.train_seed, a.attempt)
+                   a.train_seed, a.attempt, a.batch_size, a.gradient_accumulation)
     print(f'PASS: {result}')
 
 

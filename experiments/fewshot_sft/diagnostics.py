@@ -73,11 +73,18 @@ class Diagnostics:
         self.window.append(loss)
         alpha = 2/(self.c['loss_window']+1)
         self.ema = loss if self.ema is None else alpha*loss+(1-alpha)*self.ema
-        self.append('diagnostics.jsonl', dict(step=step, normalized_chunk_l1=loss,
+        record = dict(step=step, normalized_chunk_l1=loss,
             moving_mean=sum(self.window)/len(self.window), ema=self.ema, window=len(self.window),
             lr=[g['lr'] for g in context['optimizer'].param_groups],
-            task_exposure=dict(self.exposure), exposure_known_since_step=self.since,
-            microbatches=self.pending))
+            task_exposure=dict(self.exposure), exposure_known_since_step=self.since)
+        if self.c.get('diagnostics_format') == 'compact':
+            record.update(microbatch_count=len(self.pending),
+                          samples=sum(r['samples'] for r in self.pending),
+                          microbatch_loss_min=min(r['loss'] for r in self.pending),
+                          microbatch_loss_max=max(r['loss'] for r in self.pending))
+        else:
+            record['microbatches'] = self.pending
+        self.append('diagnostics.jsonl', record)
         self.pending = []
         if self.c.get('validation') and (step % self.c['validation_freq'] == 0 or
                                         step in self.c['checkpoint_steps'] or step == self.c['max_steps']):
