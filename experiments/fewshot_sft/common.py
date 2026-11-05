@@ -1,10 +1,14 @@
 import ast
 import hashlib
 import json
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'outputs/fewshot_sft'
+_output_root = os.environ.get('FEWSHOT_SFT_OUTPUT_ROOT')
+if _output_root and not Path(_output_root).is_absolute():
+    raise ValueError('FEWSHOT_SFT_OUTPUT_ROOT must be an absolute path')
+OUT = Path(_output_root).resolve() if _output_root else ROOT / 'outputs/fewshot_sft'
 OFT = ROOT / 'runtime/openvla-oft'
 NAME = 'libero_goal_no_noops'
 BASE = 'openvla/openvla-7b'
@@ -34,7 +38,7 @@ def digest(value):
 def destination(path):
     path = Path(path).resolve()
     require(path.is_relative_to(OUT.resolve()) and path != OUT.resolve(),
-            'Destination must be inside outputs/fewshot_sft')
+            f'Destination must be inside {OUT}')
     return path
 
 

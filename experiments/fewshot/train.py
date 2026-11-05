@@ -69,8 +69,6 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
     require(type(max_steps) is int and max_steps > 0 and valid_bound,
             'Invalid optimizer-step bound for this profile')
     checkpoints = checkpoint_schedule(profile, max_steps, checkpoint_steps)
-    if profile != 'legacy_batch1':
-        require(resume is None, 'Revised-profile runs must start from the pretrained base')
     require(run_id and all(ch.isalnum() or ch in '-_' for ch in run_id), 'Unsafe run ID')
     from .train_smoke import preflight
     dataset, validation, stats = preflight(suite, seed, shots)
@@ -104,6 +102,7 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         require(smoke_path is not None,
                 'Matching one-update global-64 smoke test is required')
     source_paths = [
+        'experiments/fewshot_sft/common.py',
         'runtime/openvla-oft/prismatic/vla/datasets/datasets.py',
         'runtime/openvla-oft/prismatic/vla/datasets/rlds/dataset.py',
         'runtime/openvla-oft/prismatic/vla/datasets/rlds/oxe/transforms.py',
@@ -168,13 +167,14 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
         from experiments.fewshot_sft.resume_checks import verify_normalization
         verify_normalization(resume, dataset)
         require(previous.get('stage') == 'stage3_sft' and previous['suite'] == suite
-                and previous['shots'] == shots and previous['selection_seed'] == seed,
+                and previous['shots'] == shots and previous['selection_seed'] == seed
+                and previous['profile'] == profile,
                 'Resume checkpoint belongs to a different Stage 3 condition')
         for field in ('base_revision', 'base_files', 'selection_sha256', 'normalization_sha256',
                       'architecture', 'train_seed', 'batch_size', 'gradient_accumulation',
                       'learning_rate', 'official_finetune_sha256'):
             require(previous[field] == config[field], f'Resume changed {field}')
-        require(previous['step'] < max_steps and previous['step'] in MILESTONES,
+        require(previous['step'] < max_steps and previous['step'] in previous['checkpoint_steps'],
                 'Resume must start from an earlier declared milestone')
         require((resume / 'optimizer.pt').is_file(), 'Resumable optimizer state is missing')
         config.update(resume_step=previous['step'], resume_files=inventory(resume),
@@ -182,9 +182,10 @@ def configuration(suite, seed, shots, max_steps, run_id, resume=None,
                       continuity=dict(start_step=previous['step'], tf_iterator_restored=False,
                                       rng_restored=False, bitwise_uninterrupted_equivalence=False,
                                       note='TF shuffle/prefetch restarts from the train seed.'),
-                      dataset_exposure=dict(frame_draws=max_steps - previous['step'],
+                      dataset_exposure=dict(frame_draws=(max_steps - previous['step']) * effective_batch,
                                             transitions=validation['transition_count'],
-                                            estimated_repetitions=(max_steps - previous['step']) / validation['transition_count'],
+                                            estimated_repetitions=(max_steps - previous['step']) * effective_batch
+                                                                  / validation['transition_count'],
                                             prior_optimizer_steps=previous['step']))
     else:
         if profile == 'legacy_batch1':

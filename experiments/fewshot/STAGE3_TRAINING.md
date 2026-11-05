@@ -55,3 +55,16 @@ approximately one dataset-sized volume of frame draws, while 1-shot seed 42
 coverage or guaranteed success. The 2026-11-05 Goal 20-shot pilot was started
 first to allow same-day bounded nominal evaluation; its recorded configuration
 is in `GOAL_20SHOT_RUN_2026-11-05.md`. No other condition is launched automatically.
+
+If a same-condition batch-one pilot is interrupted after a complete checkpoint,
+`--resume` can start a **new** run ID from that checkpoint, restoring its model,
+optimizer and scheduler. The checkpoint and dataset identities are verified first.
+The RLDS shuffle/prefetch iterator is not restored, so this is not bitwise
+equivalent to an uninterrupted run; the new run records that limitation. Never
+use a checkpoint from a different shot, seed, profile, batch or base model.
+
+Set `FEWSHOT_SFT_OUTPUT_ROOT` to an absolute directory to place new Stage 3
+runs, exports and evaluation under that directory. Keep the same value for
+training, export and evaluation commands. This leaves the Stage 2 RLDS and any
+old checkpoint at their original paths; `--resume` may read an old checkpoint
+from the repository while the new run writes elsewhere.

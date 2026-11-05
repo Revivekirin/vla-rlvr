@@ -1,6 +1,8 @@
 """CPU checks for the bounded Stage 3 Full training audit."""
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import sys
 import types
@@ -58,6 +60,15 @@ class FullCheckpointTests(unittest.TestCase):
 
 
 class ShotScheduleTests(unittest.TestCase):
+    def test_external_output_root_propagates_to_new_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(os.environ, FEWSHOT_SFT_OUTPUT_ROOT=directory)
+            result = subprocess.run([sys.executable, '-c',
+                'from experiments.fewshot_sft.common import OUT, destination; '
+                'print(destination(OUT / "runs" / "test"))'],
+                env=env, capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout.strip(), str(Path(directory).resolve() / 'runs' / 'test'))
+
     def test_default_and_explicit_optimizer_step_checkpoints(self):
         self.assertEqual(checkpoint_schedule('single_gpu_batch1_pilot', 52000),
                          [1000, 6000, 12000, 24000, 52000])
@@ -105,6 +116,26 @@ class ShotScheduleTests(unittest.TestCase):
             self.assertEqual(config['checkpoint_steps'], [1265, 3000, 6344])
             self.assertEqual(config['checkpoint_exposure']['6344']['nominal_dataset_passes'], 1)
             self.assertIsNone(config['resume'])
+
+            checkpoint = root / 'own-5shot-step3000'
+            checkpoint.mkdir()
+            (checkpoint / 'optimizer.pt').write_bytes(b'fixture')
+            previous = dict(config, step=3000)
+            with (mock.patch.dict(sys.modules, {'experiments.fewshot.train_smoke': smoke,
+                                                'huggingface_hub': hub, 'torch': torch}),
+                  mock.patch('experiments.fewshot.train.OUT', root),
+                  mock.patch('experiments.fewshot.train.destination', side_effect=lambda p: Path(p)),
+                  mock.patch('experiments.fewshot.train.inventory', return_value={}),
+                  mock.patch('experiments.fewshot.train.sha', return_value='sha'),
+                  mock.patch('experiments.fewshot.train.check', return_value=previous),
+                  mock.patch('experiments.fewshot_sft.resume_checks.verify_normalization')):
+                continued = configuration('goal', 42, 5, 6344, 'goal-5shot-continued',
+                                          resume=checkpoint, profile='single_gpu_batch1_pilot',
+                                          checkpoint_steps=[1265, 3000, 6344])
+            self.assertEqual(continued['resume_step'], 3000)
+            self.assertEqual(continued['checkpoint_steps'], [6344])
+            self.assertEqual(continued['dataset_exposure']['frame_draws'], 3344)
+            self.assertFalse(continued['continuity']['bitwise_uninterrupted_equivalence'])
 
 
 if __name__ == '__main__':
